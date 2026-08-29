@@ -1,0 +1,7 @@
+<class_libraries>
+	<library path="a_star_planner">
+		<class type="auv_planning::AStarPlanner" base_class_type="nav2_core::GlobalPlanner">
+		  <description>Current-aware A* planner: biases path cost by alignment with water_current_speed / water_current_direction_north.</description>
+		</class>
+	</library>
+</class_libraries>

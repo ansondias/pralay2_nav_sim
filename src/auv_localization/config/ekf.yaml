@@ -1,0 +1,32 @@
+ekf_filter_node:
+  ros__parameters:
+    use_sim_time: true
+    frequency: 30.0
+    two_d_mode: true
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # "DVL-like" velocity source: the sim's diff-drive plugin odometry,
+    # standing in for a real DVL + depth sensor fusion front-end. Only the
+    # twist fields are trusted here; the EKF integrates pose itself.
+    odom0: /dvl_odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  true,  false,
+                   false, false, true,
+                   false, false, false]
+    odom0_differential: false
+    odom0_relative: false
+
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                   false, false, true,
+                   false, false, false,
+                   false, false, true,
+                   false, false, false]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true

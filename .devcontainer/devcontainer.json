@@ -1,0 +1,37 @@
+{
+  "name": "pralay2_nav_sim (ROS 2 Jazzy + Gazebo Harmonic)",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+      "webPort": "6080",
+      "vncPort": "5901"
+    }
+  },
+  "forwardPorts": [6080, 5901],
+  "portsAttributes": {
+    "6080": {
+      "label": "noVNC desktop (Gazebo / RViz GUI)",
+      "onAutoForward": "notify"
+    }
+  },
+  "containerEnv": {
+    "LIBGL_ALWAYS_SOFTWARE": "1"
+  },
+  "workspaceFolder": "/workspaces/pralay2_nav_sim",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/pralay2_nav_sim,type=bind",
+  "remoteUser": "ros",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "redhat.vscode-xml",
+        "redhat.vscode-yaml",
+        "ms-iot.vscode-ros"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && rosdep install --from-paths src --ignore-src -r -y || true"
+}
