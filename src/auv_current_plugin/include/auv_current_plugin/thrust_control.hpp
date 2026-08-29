@@ -50,8 +50,21 @@ private:
   double cmd_linear_x_{0.0};
   double cmd_angular_z_{0.0};
 
-  double linear_gain_{400.0};   // N per (m/s) of velocity error
-  double angular_gain_{200.0};  // N*m per (rad/s) of velocity error
+  // Gains are deliberately conservative relative to the hull's mass/inertia
+  // and the physics step size: an explicit-Euler-integrated P controller on
+  // a rigid body is only stable while gain < 2*I/dt (I = mass or moment of
+  // inertia, dt = physics step). For this hull (~20 kg, yaw inertia ~0.22
+  // kg*m^2) at dt=0.004s that bound is ~10000 N/(m/s) linear and ~110
+  // N*m/(rad/s) angular -- a first version of this plugin used an angular
+  // gain of 200, past that bound, which diverged into a runaway spin and
+  // crashed the physics solver on the very first rotation command.
+  double linear_gain_{40.0};    // N per (m/s) of velocity error
+  double angular_gain_{0.5};    // N*m per (rad/s) of velocity error
+
+  // Hard force/torque caps as a second line of defense, independent of
+  // gain tuning (e.g. against a sudden large cmd_vel jump).
+  double max_force_{200.0};   // N
+  double max_torque_{20.0};   // N*m
 };
 
 }  // namespace auv_current_plugin

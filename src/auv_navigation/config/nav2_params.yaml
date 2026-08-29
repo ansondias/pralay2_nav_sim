@@ -203,16 +203,23 @@ collision_monitor:
     use_sim_time: true
     # rclcpp's --params-file YAML loader can't infer a type for an empty
     # list ([]) and throws at node startup before any of collision_monitor's
-    # own code runs -- so instead of disabling via [], point it at a scan
-    # topic nothing publishes (no onboard obstacle/range sensor in this
-    # sandbox, see the README's "Known simplifications"): it configures
-    # fine and just idles, waiting for observations that never arrive.
-    # (polygons is left unset entirely -- it has a safe internal default,
-    # unlike observation_sources, and hits the same empty-list problem.)
+    # own code runs -- both observation_sources and polygons are required
+    # (no safe internal default for either, unlike most nav2 nodes), so
+    # instead of disabling via [], give it real-but-inert values: a scan
+    # topic nothing publishes, and a tiny polygon that only ever sees
+    # points from that (always-empty) source. No onboard obstacle/range
+    # sensor in this sandbox -- see the README's "Known simplifications".
     observation_sources: ["unused_scan"]
     unused_scan:
       type: "scan"
       topic: "/unused_scan"
+    polygons: ["unused_polygon"]
+    unused_polygon:
+      type: "polygon"
+      points: [0.1, 0.1, 0.1, -0.1, -0.1, -0.1, -0.1, 0.1]
+      action_type: "stop"
+      min_points: 1
+      visualize: false
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     transform_tolerance: 0.5

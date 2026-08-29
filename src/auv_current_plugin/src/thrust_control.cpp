@@ -1,5 +1,7 @@
 #include "auv_current_plugin/thrust_control.hpp"
 
+#include <algorithm>
+
 #include <gz/plugin/Register.hh>
 #include <gz/math/Pose3.hh>
 #include <gz/math/Vector3.hh>
@@ -30,6 +32,12 @@ void ThrustControl::Configure(
   }
   if (sdf->HasElement("angular_gain")) {
     angular_gain_ = sdf->Get<double>("angular_gain");
+  }
+  if (sdf->HasElement("max_force")) {
+    max_force_ = sdf->Get<double>("max_force");
+  }
+  if (sdf->HasElement("max_torque")) {
+    max_torque_ = sdf->Get<double>("max_torque");
   }
 
   std::string topic = "/cmd_vel";
@@ -74,13 +82,18 @@ void ThrustControl::PreUpdate(
     pose_opt->Rot() * gz::math::Vector3d(cmd_x, 0.0, 0.0);
 
   const gz::math::Vector3d lin_error = desired_world_vel - *lin_vel_opt;
-  const gz::math::Vector3d force(
+  gz::math::Vector3d force(
     lin_error.X() * linear_gain_,
     lin_error.Y() * linear_gain_,
     0.0);  // horizontal thrust only, matches the fixed-depth simplification
+  if (force.Length() > max_force_) {
+    force = force.Normalized() * max_force_;
+  }
 
   const double ang_error = cmd_yaw - ang_vel_opt->Z();
-  const gz::math::Vector3d torque(0.0, 0.0, ang_error * angular_gain_);
+  double torque_z = ang_error * angular_gain_;
+  torque_z = std::clamp(torque_z, -max_torque_, max_torque_);
+  const gz::math::Vector3d torque(0.0, 0.0, torque_z);
 
   link_.AddWorldWrench(ecm, force, torque);
 }

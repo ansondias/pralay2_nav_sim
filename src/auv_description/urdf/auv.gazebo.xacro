@@ -22,8 +22,13 @@
     <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
       <link_name>base_link</link_name>
       <topic>/cmd_vel</topic>
-      <linear_gain>400.0</linear_gain>
-      <angular_gain>200.0</angular_gain>
+      <!-- Keep these below ~2*I/dt (physics step dt=4ms) for this hull's
+           mass/yaw-inertia, or the P controller diverges; see
+           thrust_control.hpp for the derivation. -->
+      <linear_gain>40.0</linear_gain>
+      <angular_gain>0.5</angular_gain>
+      <max_force>200.0</max_force>
+      <max_torque>20.0</max_torque>
     </plugin>
   </gazebo>
 
