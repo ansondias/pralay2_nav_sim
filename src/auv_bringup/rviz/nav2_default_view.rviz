@@ -47,7 +47,7 @@ Visualization Manager:
       Name: FilteredOdometry
       Topic:
         Value: /odometry/filtered
-      Enabled: true
+      Enabled: false
   Global Options:
     Fixed Frame: map
     Background Color: 10; 20; 35
