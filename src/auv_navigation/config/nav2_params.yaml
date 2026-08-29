@@ -201,12 +201,18 @@ velocity_smoother:
 collision_monitor:
   ros__parameters:
     use_sim_time: true
-    # No onboard obstacle/range sensor in this sandbox (see the README's
-    # "Known simplifications"): observation_sources/polygons must be
-    # declared even when empty, or this node refuses to configure and
-    # aborts the whole navigation lifecycle bringup.
-    observation_sources: []
-    polygons: []
+    # rclcpp's --params-file YAML loader can't infer a type for an empty
+    # list ([]) and throws at node startup before any of collision_monitor's
+    # own code runs -- so instead of disabling via [], point it at a scan
+    # topic nothing publishes (no onboard obstacle/range sensor in this
+    # sandbox, see the README's "Known simplifications"): it configures
+    # fine and just idles, waiting for observations that never arrive.
+    # (polygons is left unset entirely -- it has a safe internal default,
+    # unlike observation_sources, and hits the same empty-list problem.)
+    observation_sources: ["unused_scan"]
+    unused_scan:
+      type: "scan"
+      topic: "/unused_scan"
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     transform_tolerance: 0.5

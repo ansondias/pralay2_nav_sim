@@ -26,7 +26,12 @@ def generate_launch_description():
     )
     x_arg = DeclareLaunchArgument("x", default_value="0.0")
     y_arg = DeclareLaunchArgument("y", default_value="0.0")
-    z_arg = DeclareLaunchArgument("z", default_value="-2.0")
+    # ocean_arena's seafloor plane is at z=0 with obstacles built above it
+    # (e.g. reef tops around z=2) -- spawn well clear of both, not below
+    # the floor (a negative default here previously spawned the hull
+    # underground, deeply interpenetrating the floor plane and blowing up
+    # the physics solver on the first few steps).
+    z_arg = DeclareLaunchArgument("z", default_value="3.0")
     yaw_arg = DeclareLaunchArgument("yaw", default_value="0.0")
 
     gz_sim_launch = os.path.join(
