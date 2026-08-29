@@ -3,6 +3,15 @@ FROM osrf/ros:jazzy-desktop-full
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=jazzy
 
+# libgz-sim8-dev (needed to build auv_current_plugin against gz-sim headers)
+# lives in the Gazebo project's own apt repo, not packages.ros.org -- add it
+# before installing anything from it.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    lsb-release wget gnupg \
+    && wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+       > /etc/apt/sources.list.d/gazebo-stable.list
+
 # Gazebo Harmonic (the Jazzy-paired Gazebo release) + ROS<->Gazebo bridge,
 # Nav2, robot_localization for sensor fusion, and dev tooling.
 RUN apt-get update && apt-get install -y --no-install-recommends \
