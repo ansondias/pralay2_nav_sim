@@ -53,7 +53,7 @@ RUN if getent passwd $USER_UID > /dev/null; then \
         groupdel "$(getent group $USER_GID | cut -d: -f1)" 2>/dev/null || true; \
     fi \
     && groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m --shell /bin/bash $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && apt-get update && apt-get install -y --no-install-recommends sudo && rm -rf /var/lib/apt/lists/*
@@ -63,5 +63,11 @@ RUN rosdep update
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/$USERNAME/.bashrc \
     && echo "if [ -f /workspaces/pralay2_nav_sim/install/setup.bash ]; then source /workspaces/pralay2_nav_sim/install/setup.bash; fi" >> /home/$USERNAME/.bashrc
+
+# Belt-and-suspenders: also source ROS system-wide, in case a terminal or
+# task ever gets spawned in a way that skips the user's own ~/.bashrc.
+USER root
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /etc/bash.bashrc
+USER $USERNAME
 
 WORKDIR /workspaces/pralay2_nav_sim

@@ -30,7 +30,10 @@
         "redhat.vscode-xml",
         "redhat.vscode-yaml",
         "ms-iot.vscode-ros"
-      ]
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
     }
   },
   "postCreateCommand": "sudo apt-get update && rosdep install --from-paths src --ignore-src -r -y || true"
