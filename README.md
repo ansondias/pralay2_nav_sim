@@ -74,7 +74,15 @@ current live over a Gazebo topic instead of editing the world file).
 - **No onboard obstacle sensor**: the local costmap only inflates around the
   static map (`local_costmap` in `nav2_params.yaml` has no `obstacle_layer`).
   Add a sonar/lidar sensor to `auv_description` and wire it in for real
-  obstacle avoidance beyond the static map.
+  obstacle avoidance beyond the static map. `collision_monitor`'s
+  `observation_sources` points at `/unused_scan`, a topic nothing real
+  publishes to -- `auv_bringup/scripts/unused_scan_publisher.py` sends a
+  real but always-empty ("no detections") scan there instead of leaving
+  it silent, because collision_monitor treats a source that never
+  publishes as invalid and zeroes the robot's outgoing cmd_vel as a
+  safety fallback (this is what silently blocked all Nav2-driven motion
+  before that publisher was added -- manual `cmd_vel` still worked, since
+  it bypasses collision_monitor entirely).
 - **No global localization node**: `map -> odom` is a fixed identity
   transform (`auv_localization/launch/localization.launch.py`), not AMCL or
   a real DVL-based localizer. Fine for testing the planner/costmap/current
