@@ -70,7 +70,20 @@ def generate_launch_description():
         ],
     )
 
-    # 4. Default nav2 navigation stack, GridBased planner = auv_planning::AStarPlanner
+    # 4. Keeps collision_monitor's required-but-unused observation source
+    #    "alive": a source that never publishes anything gets treated as
+    #    invalid, and collision_monitor's fallback for that is to zero the
+    #    robot's outgoing cmd_vel -- silently blocking all Nav2-driven
+    #    motion (manual cmd_vel still worked, since that bypasses it).
+    unused_scan_publisher = Node(
+        package="auv_bringup",
+        executable="unused_scan_publisher.py",
+        name="unused_scan_publisher",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
+    # 5. Default nav2 navigation stack, GridBased planner = auv_planning::AStarPlanner
     navigation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -107,6 +120,7 @@ def generate_launch_description():
             localization,
             map_server,
             map_server_lifecycle,
+            unused_scan_publisher,
             navigation,
             rviz,
         ]

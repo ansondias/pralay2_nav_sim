@@ -7,4 +7,9 @@ install(DIRECTORY launch maps rviz scripts
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/unused_scan_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
