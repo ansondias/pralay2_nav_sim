@@ -9,22 +9,34 @@
     <gravity>false</gravity>
   </gazebo>
 
-  <!-- cmd_vel -> planar motion, via two virtual (non-visible-drive) thruster joints -->
+  <!-- cmd_vel -> a body-frame thrust force/torque applied directly to the
+       hull. DiffDrive won't work here: it moves a robot via simulated
+       wheel-to-ground friction, and this AUV never touches the ground
+       (gravity disabled, floating at a fixed depth). gz-sim's
+       VelocityControl system would work depth-wise but *overwrites* the
+       model's velocity every tick, silently cancelling
+       auv_current_plugin::OceanCurrent's drag force; ThrustControl
+       applies a force instead, so thrust and current genuinely combine
+       through physics. -->
   <gazebo>
-    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-      <left_joint>left_thruster_joint</left_joint>
-      <right_joint>right_thruster_joint</right_joint>
-      <wheel_separation>0.4</wheel_separation>
-      <wheel_radius>0.10</wheel_radius>
+    <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
+      <link_name>base_link</link_name>
       <topic>/cmd_vel</topic>
-      <odom_topic>/dvl_odom</odom_topic>
-      <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
+      <linear_gain>400.0</linear_gain>
+      <angular_gain>200.0</angular_gain>
+    </plugin>
+  </gazebo>
+
+  <!-- "DVL-like" odometry: real physics-measured pose/twist (not a
+       kinematic echo of the commanded velocity), matching what a DVL +
+       depth sensor front-end would actually give the EKF. -->
+  <gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <dimensions>2</dimensions>
       <odom_publish_frequency>20</odom_publish_frequency>
-      <max_linear_acceleration>2</max_linear_acceleration>
-      <min_linear_acceleration>-2</min_linear_acceleration>
-      <max_angular_acceleration>3</max_angular_acceleration>
-      <min_angular_acceleration>-3</min_angular_acceleration>
+      <odom_topic>/dvl_odom</odom_topic>
     </plugin>
   </gazebo>
 
@@ -37,7 +49,6 @@
       <always_on>true</always_on>
       <update_rate>50</update_rate>
       <topic>/imu/data</topic>
-      <gz_frame_id>imu_link</gz_frame_id>
     </sensor>
   </gazebo>
 

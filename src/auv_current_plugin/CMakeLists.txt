@@ -14,21 +14,23 @@ find_package(gz-msgs10 REQUIRED)
 find_package(gz-math7 REQUIRED)
 
 add_library(ocean_current SHARED src/ocean_current.cpp)
+add_library(thrust_control SHARED src/thrust_control.cpp)
 
-target_include_directories(ocean_current PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
+foreach(target ocean_current thrust_control)
+  target_include_directories(${target} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_link_libraries(${target}
+    gz-sim8::gz-sim8
+    gz-plugin2::register
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
+    gz-math7::gz-math7
+  )
+endforeach()
 
-target_link_libraries(ocean_current
-  gz-sim8::gz-sim8
-  gz-plugin2::register
-  gz-transport13::gz-transport13
-  gz-msgs10::gz-msgs10
-  gz-math7::gz-math7
-)
-
-install(TARGETS ocean_current
+install(TARGETS ocean_current thrust_control
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -41,6 +43,6 @@ install(DIRECTORY include/
 ament_environment_hooks(hooks/gz_sim_system_plugin_path.sh)
 
 ament_export_include_directories(include)
-ament_export_libraries(ocean_current)
+ament_export_libraries(ocean_current thrust_control)
 
 ament_package()

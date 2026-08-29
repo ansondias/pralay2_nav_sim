@@ -197,3 +197,16 @@ velocity_smoother:
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0
+
+collision_monitor:
+  ros__parameters:
+    use_sim_time: true
+    # No onboard obstacle/range sensor in this sandbox (see the README's
+    # "Known simplifications"): observation_sources/polygons must be
+    # declared even when empty, or this node refuses to configure and
+    # aborts the whole navigation lifecycle bringup.
+    observation_sources: []
+    polygons: []
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    transform_tolerance: 0.5

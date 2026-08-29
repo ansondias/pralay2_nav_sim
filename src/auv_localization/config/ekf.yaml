@@ -9,9 +9,10 @@ ekf_filter_node:
     base_link_frame: base_link
     world_frame: odom
 
-    # "DVL-like" velocity source: the sim's diff-drive plugin odometry,
-    # standing in for a real DVL + depth sensor fusion front-end. Only the
-    # twist fields are trusted here; the EKF integrates pose itself.
+    # "DVL-like" velocity source: the sim's OdometryPublisher plugin
+    # (real physics-measured twist), standing in for a real DVL + depth
+    # sensor fusion front-end. Only the twist fields are trusted here;
+    # the EKF integrates pose itself.
     odom0: /dvl_odom
     odom0_config: [false, false, false,
                    false, false, false,

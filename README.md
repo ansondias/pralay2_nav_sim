@@ -1,8 +1,7 @@
 # pralay2_nav_sim
 
 A standalone sandbox for testing Nav2 path planning against a simulated
-water current, and for iterating on a custom global planner. **Contains no
-company code** -- everything here is written from scratch for this sandbox
+water current, and for iterating on a custom global planner.
 (a generic placeholder AUV, a fresh A* implementation, a custom lightweight
 Gazebo current plugin). It exists to prototype ideas before they're ported
 into the real `auv_planning` package in the main workspace.
@@ -59,8 +58,8 @@ current live over a Gazebo topic instead of editing the world file).
 | Package | Purpose |
 |---|---|
 | `auv_planning` | **Main deliverable.** `nav2_core::GlobalPlanner` plugin(s) for the `GridBased` slot -- iterate on your planning algorithm here. |
-| `auv_current_plugin` | Gazebo (gz-sim) system plugin applying a configurable horizontal current drag force. |
-| `auv_description` | Generic placeholder AUV URDF/xacro (torpedo hull, IMU, DVL-like odometry via a diff-drive-style plugin). |
+| `auv_current_plugin` | Gazebo (gz-sim) system plugins: `OceanCurrent` (configurable horizontal current drag force) and `ThrustControl` (cmd_vel -> body-frame thrust force/torque, since a floating AUV has no ground contact for a wheeled-robot plugin to push against). |
+| `auv_description` | Generic placeholder AUV URDF/xacro (torpedo hull, IMU, DVL-like odometry via gz-sim's `OdometryPublisher`). |
 | `auv_gazebo` | The `ocean_arena` world, spawn launch, ros_gz bridge config. |
 | `auv_localization` | `robot_localization` EKF (IMU + simulated DVL odom) -> `/odometry/filtered`. |
 | `auv_navigation` | Nav2 params (stock defaults except the `GridBased` planner plugin) + a wrapper around `nav2_bringup`'s `navigation_launch.py`. |
