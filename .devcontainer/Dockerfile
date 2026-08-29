@@ -42,7 +42,17 @@ RUN if [ ! -d /etc/ros/rosdep/sources.list.d ] || [ -z "$(ls -A /etc/ros/rosdep/
 ARG USERNAME=ros
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME \
+# Ubuntu 24.04 (Noble) base images ship a default "ubuntu" user/group at
+# 1000:1000 already -- remove it so our own user can take that UID/GID
+# (kept at 1000 rather than shifted, so bind-mounted workspace files stay
+# owned by the host user instead of an unrelated UID).
+RUN if getent passwd $USER_UID > /dev/null; then \
+        userdel -r "$(getent passwd $USER_UID | cut -d: -f1)" 2>/dev/null || true; \
+    fi \
+    && if getent group $USER_GID > /dev/null; then \
+        groupdel "$(getent group $USER_GID | cut -d: -f1)" 2>/dev/null || true; \
+    fi \
+    && groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
