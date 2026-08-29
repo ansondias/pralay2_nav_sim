@@ -226,3 +226,14 @@ collision_monitor:
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     transform_tolerance: 0.5
+
+docking_server:
+  ros__parameters:
+    use_sim_time: true
+    # No docking station in this sandbox -- dock_plugins has no safe
+    # default either (same story as collision_monitor's required params),
+    # so give it a real plugin that just never gets invoked (nothing ever
+    # calls the DockRobot action).
+    dock_plugins: ["dummy_dock"]
+    dummy_dock:
+      plugin: "opennav_docking::SimpleChargingDock"
