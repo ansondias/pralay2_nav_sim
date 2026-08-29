@@ -7,6 +7,7 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -46,7 +47,11 @@ def generate_launch_description():
     xacro_file = PathJoinSubstitution(
         [FindPackageShare("auv_description"), "urdf", "auv.urdf.xacro"]
     )
-    robot_description = {"robot_description": Command(["xacro ", xacro_file])}
+    robot_description = {
+        "robot_description": ParameterValue(
+            Command(["xacro ", xacro_file]), value_type=str
+        )
+    }
 
     robot_state_publisher = Node(
         package="robot_state_publisher",
