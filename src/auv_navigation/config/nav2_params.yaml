@@ -216,7 +216,10 @@ collision_monitor:
     polygons: ["unused_polygon"]
     unused_polygon:
       type: "polygon"
-      points: [0.1, 0.1, 0.1, -0.1, -0.1, -0.1, -0.1, 0.1]
+      # collision_monitor parses this as a JSON-formatted string of [x, y]
+      # pairs, not a native YAML/ROS array -- a plain double_array here
+      # fails with a parameter-type mismatch at configure time.
+      points: "[[0.1, 0.1], [0.1, -0.1], [-0.1, -0.1], [-0.1, 0.1]]"
       action_type: "stop"
       min_points: 1
       visualize: false
