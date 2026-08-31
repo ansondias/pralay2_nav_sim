@@ -1,7 +1,8 @@
 {
   "name": "pralay2_nav_sim (ROS 2 Jazzy + Gazebo Harmonic)",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "options": ["--platform=linux/amd64"]
   },
   "features": {
     "ghcr.io/devcontainers/features/desktop-lite:1": {

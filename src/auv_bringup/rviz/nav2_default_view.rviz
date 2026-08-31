@@ -55,7 +55,6 @@ Visualization Manager:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera
     - Class: nav2_rviz_plugins/GoalTool
-    - Class: nav2_rviz_plugins/NavThroughPosesTool
   Views:
     Current:
       Class: rviz_default_plugins/TopDownOrtho

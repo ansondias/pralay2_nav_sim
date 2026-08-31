@@ -11,6 +11,7 @@ empty -- no ranges, meaning "no detections") scan keeps it satisfied
 without pretending to have a working obstacle sensor.
 """
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 
@@ -38,9 +39,14 @@ class UnusedScanPublisher(Node):
 def main():
     rclpy.init()
     node = UnusedScanPublisher()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        # Normal Ctrl+C / launch-initiated shutdown: exit quietly.
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

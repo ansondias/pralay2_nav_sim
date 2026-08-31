@@ -5,7 +5,14 @@ bt_navigator:
     robot_base_frame: base_link
     odom_topic: /odometry/filtered
     bt_loop_duration: 10
-    default_server_timeout: 20
+    # How long (ms) a BT action node waits for an action server (planner,
+    # controller, ...) to *acknowledge* a goal. Nav2's stock 20 ms is fine on
+    # native hardware, but this sandbox runs an amd64 container under
+    # Rosetta with Gazebo + RViz on software GL, and planner_server took
+    # >20 ms to ack -- every Nav2 goal then died immediately with
+    # "Timed out while waiting for action server to acknowledge goal request
+    # for compute_path_to_pose" before the controller was ever invoked.
+    default_server_timeout: 1000
     wait_for_service_timeout: 1000
     action_server_result_timeout: 900.0
     navigators: ["navigate_to_pose", "navigate_through_poses"]
