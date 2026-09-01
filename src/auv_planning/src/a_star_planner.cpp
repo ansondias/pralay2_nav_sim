@@ -1,257 +1,191 @@
-#include "auv_planning/a_star_planner.hpp"
-
-#include <algorithm>
 #include <cmath>
-#include <queue>
-#include <unordered_map>
-#include <vector>
 
-#include "nav2_costmap_2d/cost_values.hpp"
-#include "nav2_util/node_utils.hpp"
-#include "tf2/LinearMath/Quaternion.h"
-#include "tf2/utils.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "auv_planning/a_star_planner.hpp"
 
 namespace auv_planning
 {
-
-namespace
-{
-// 8-connected neighbour offsets.
-constexpr int kNeighbours[8][2] = {
-  {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-  {1, 1}, {1, -1}, {-1, 1}, {-1, -1},
-};
-
-int CellIndex(int x, int y, int width)
-{
-  return y * width + x;
-}
-}  // namespace
-
 void AStarPlanner::configure(
   const rclcpp_lifecycle::LifecycleNode::WeakPtr & parent,
-  std::string name,
-  std::shared_ptr<tf2_ros::Buffer> tf,
+  std::string name, std::shared_ptr<tf2_ros::Buffer> tf,
   std::shared_ptr<nav2_costmap_2d::Costmap2DROS> costmap_ros)
 {
-  node_ = parent;
+  node_ = parent.lock();
   name_ = name;
   tf_ = tf;
-  costmap_ros_ = costmap_ros;
   costmap_ = costmap_ros->getCostmap();
   global_frame_ = costmap_ros->getGlobalFrameID();
 
-  auto node = parent.lock();
+  smooth_client_ = rclcpp_action::create_client<nav2_msgs::action::SmoothPath>(node_, "smooth_path");
 
-  nav2_util::declare_parameter_if_not_declared(
-    node, name_ + ".water_current_speed", rclcpp::ParameterValue(0.0));
-  nav2_util::declare_parameter_if_not_declared(
-    node, name_ + ".water_current_direction_north", rclcpp::ParameterValue(0.0));
-  nav2_util::declare_parameter_if_not_declared(
-    node, name_ + ".current_cost_weight", rclcpp::ParameterValue(0.5));
-  nav2_util::declare_parameter_if_not_declared(
-    node, name_ + ".allow_unknown", rclcpp::ParameterValue(true));
 
-  node->get_parameter(name_ + ".water_current_speed", water_current_speed_);
-  node->get_parameter(name_ + ".water_current_direction_north", water_current_direction_north_);
-  node->get_parameter(name_ + ".current_cost_weight", current_cost_weight_);
-  node->get_parameter(name_ + ".allow_unknown", allow_unknown_);
 
+// // Parameter initialization
+// nav2::declare_parameter_if_not_declared(node_, name_ + ".water_current_speed", rclcpp::ParameterValue(0.0));
+// node_->get_parameter(name_ + ".water_current_speed", water_current_speed_);
+
+// // Parameter initialization
+// nav2::declare_parameter_if_not_declared(node_, name_ + ".water_current_direction_north", rclcpp::ParameterValue(0.0));
+// node_->get_parameter(name_ + ".water_current_direction_north", water_current_direction_north_);
+
+
+// NEW / FIX:
+auto node = parent.lock();
+if (!node) {
+  throw std::runtime_error("Failed to lock node reference");
+}
+
+// Option A: Standard ROS 2 parameter declaration (Recommended)
+if (!node->has_parameter(name_ + ".water_current_speed")) {
+  node->declare_parameter(name_ + ".water_current_speed", 0.0);
+}
+
+if (!node->has_parameter(name_ + ".water_current_direction_north")) {
+  node->declare_parameter(name_ + ".water_current_direction_north", 0.0);
+}
+
+
+node->get_parameter(name_ + ".water_current_speed", water_current_speed_);
+node->get_parameter(name_ + ".water_current_direction_north", water_current_direction_north_);
+
+
+
+
+
+}
+
+void AStarPlanner::cleanup()
+{
   RCLCPP_INFO(
-    node->get_logger(),
-    "AStarPlanner[%s]: water_current_speed=%.2f m/s, "
-    "water_current_direction_north=%.1f deg, current_cost_weight=%.2f",
-    name_.c_str(), water_current_speed_, water_current_direction_north_, current_cost_weight_);
+    node_->get_logger(), "CleaningUp plugin %s of type AStarPlanner",
+    name_.c_str());
 }
 
-void AStarPlanner::cleanup() {}
-void AStarPlanner::activate() {}
-void AStarPlanner::deactivate() {}
-
-double AStarPlanner::currentCostMultiplier(int dx, int dy) const
+void AStarPlanner::activate()
 {
-  if (water_current_speed_ <= 0.0 || (dx == 0 && dy == 0)) {
-    return 1.0;
+  RCLCPP_INFO(
+    node_->get_logger(), "Activating plugin %s of type AStarPlanner",
+    name_.c_str());
+  if (!smooth_client_->wait_for_action_server(std::chrono::seconds(3))) {
+    RCLCPP_ERROR(node_->get_logger(), "Action server not available after waiting");
   }
-
-  // World frame is ENU: +X east, +Y north. direction_north is the compass
-  // bearing (clockwise from north) the current flows toward -- kept in the
-  // same convention as auv_current_plugin's OceanCurrent Gazebo plugin so a
-  // scenario's current can be mirrored between sim and planner params.
-  const double theta = water_current_direction_north_ * M_PI / 180.0;
-  const double current_x = std::sin(theta);
-  const double current_y = std::cos(theta);
-
-  const double step_len = std::sqrt(static_cast<double>(dx * dx + dy * dy));
-  const double step_x = dx / step_len;
-  const double step_y = dy / step_len;
-
-  // +1 = moving with the current, -1 = moving straight into it.
-  const double alignment = step_x * current_x + step_y * current_y;
-
-  const double strength = std::tanh(water_current_speed_) * current_cost_weight_;
-  const double multiplier = 1.0 - strength * alignment;
-
-  return std::clamp(multiplier, 0.2, 2.0);
 }
 
-double AStarPlanner::octileHeuristic(int x0, int y0, int x1, int y1) const
+void AStarPlanner::deactivate()
 {
-  const double dx = std::abs(x1 - x0);
-  const double dy = std::abs(y1 - y0);
-  constexpr double kD1 = 1.0;
-  constexpr double kD2 = M_SQRT2;
-  return kD1 * (dx + dy) + (kD2 - 2 * kD1) * std::min(dx, dy);
+  RCLCPP_INFO(
+    node_->get_logger(), "Deactivating plugin %s of type AStarPlanner",
+    name_.c_str());
 }
 
 nav_msgs::msg::Path AStarPlanner::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
   const geometry_msgs::msg::PoseStamped & goal,
-  std::function<bool()> cancel_checker)
+  std::function<bool()>)
 {
-  nav_msgs::msg::Path path;
-  auto node = node_.lock();
-  path.header.frame_id = global_frame_;
-  path.header.stamp = node ? node->now() : rclcpp::Clock().now();
+  std::vector<std::pair<int, int>> explore_directions = {
+    {-1, 0}, {1, 0}, {0, -1}, {0, 1}
+  };
 
-  unsigned int start_mx, start_my, goal_mx, goal_my;
-  if (!costmap_->worldToMap(start.pose.position.x, start.pose.position.y, start_mx, start_my)) {
-    throw std::runtime_error("AStarPlanner: start pose is outside of the costmap bounds");
-  }
-  if (!costmap_->worldToMap(goal.pose.position.x, goal.pose.position.y, goal_mx, goal_my)) {
-    throw std::runtime_error("AStarPlanner: goal pose is outside of the costmap bounds");
-  }
+  std::priority_queue<GraphNode, std::vector<GraphNode>, std::greater<GraphNode>> pending_nodes;
+  std::vector<GraphNode> visited_nodes;
+  
+  GraphNode start_node = worldToGrid(start.pose);
+  GraphNode goal_node = worldToGrid(goal.pose);
+  start_node.heuristic = manhattanDistance(start_node, goal_node); // Heuristic calculation
+  pending_nodes.push(start_node);
 
-  const int width = static_cast<int>(costmap_->getSizeInCellsX());
-  const int height = static_cast<int>(costmap_->getSizeInCellsY());
-  const int start_x = static_cast<int>(start_mx);
-  const int start_y = static_cast<int>(start_my);
-  const int goal_x = static_cast<int>(goal_mx);
-  const int goal_y = static_cast<int>(goal_my);
+  GraphNode active_node;
+  while (!pending_nodes.empty() && rclcpp::ok()) {
+    active_node = pending_nodes.top();
+    pending_nodes.pop();
 
-  std::vector<AStarCell> pool;
-  pool.reserve(static_cast<size_t>(width) * static_cast<size_t>(height) / 4 + 16);
-
-  auto cmp = [&pool](int a, int b) {return pool[a].F() > pool[b].F();};
-  std::priority_queue<int, std::vector<int>, decltype(cmp)> open(cmp);
-
-  std::unordered_map<int, double> best_g;
-  std::unordered_map<int, int> came_from_index;
-
-  AStarCell start_cell;
-  start_cell.x = start_x;
-  start_cell.y = start_y;
-  start_cell.g = 0.0;
-  start_cell.h = octileHeuristic(start_x, start_y, goal_x, goal_y);
-  start_cell.parent_index = -1;
-  pool.push_back(start_cell);
-  open.push(0);
-  best_g[CellIndex(start_x, start_y, width)] = 0.0;
-
-  int goal_pool_index = -1;
-  int expansions = 0;
-
-  while (!open.empty()) {
-    if ((++expansions % 500) == 0 && cancel_checker()) {
-      throw std::runtime_error("AStarPlanner: planning was cancelled");
-    }
-
-    const int current_index = open.top();
-    open.pop();
-    const AStarCell current = pool[current_index];
-    const int current_cell_index = CellIndex(current.x, current.y, width);
-
-    if (auto it = best_g.find(current_cell_index);
-      it != best_g.end() && current.g > it->second + 1e-9)
-    {
-      continue;  // stale queue entry
-    }
-
-    if (current.x == goal_x && current.y == goal_y) {
-      goal_pool_index = current_index;
+    // Goal found!
+    if (active_node == goal_node) {
       break;
     }
 
-    for (const auto & offset : kNeighbours) {
-      const int nx = current.x + offset[0];
-      const int ny = current.y + offset[1];
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
-        continue;
-      }
-
-      const unsigned char cost = costmap_->getCost(nx, ny);
-      if (cost == nav2_costmap_2d::LETHAL_OBSTACLE ||
-        cost == nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE)
-      {
-        continue;
-      }
-      if (!allow_unknown_ && cost == nav2_costmap_2d::NO_INFORMATION) {
-        continue;
-      }
-
-      const double step_cost =
-        std::sqrt(static_cast<double>(offset[0] * offset[0] + offset[1] * offset[1])) *
-        currentCostMultiplier(offset[0], offset[1]) *
-        (1.0 + static_cast<double>(cost) / 255.0);
-
-      const double tentative_g = current.g + step_cost;
-      const int neighbour_cell_index = CellIndex(nx, ny, width);
-
-      auto it = best_g.find(neighbour_cell_index);
-      if (it != best_g.end() && tentative_g >= it->second - 1e-9) {
-        continue;
-      }
-
-      best_g[neighbour_cell_index] = tentative_g;
-
-      AStarCell neighbour;
-      neighbour.x = nx;
-      neighbour.y = ny;
-      neighbour.g = tentative_g;
-      neighbour.h = octileHeuristic(nx, ny, goal_x, goal_y);
-      neighbour.parent_index = current_index;
-
-      pool.push_back(neighbour);
-      open.push(static_cast<int>(pool.size()) - 1);
+    // Explore neighbors
+    for (const auto & dir : explore_directions) {
+        GraphNode new_node = active_node + dir;
+        // Check if the new position is within bounds and not an obstacle
+        if (std::find(visited_nodes.begin(), visited_nodes.end(), new_node) == visited_nodes.end() &&
+            poseOnMap(new_node) && costmap_->getCost(new_node.x, new_node.y) < 99) {
+            // If the node is not visited, add it to the queue
+            new_node.cost = active_node.cost + 1 + costmap_->getCost(new_node.x, new_node.y);
+            new_node.heuristic = manhattanDistance(new_node, goal_node);
+            new_node.prev = std::make_shared<GraphNode>(active_node);
+            pending_nodes.push(new_node);
+            visited_nodes.push_back(new_node);
+        }
     }
   }
 
-  if (goal_pool_index < 0) {
-    throw std::runtime_error("AStarPlanner: no valid path could be found");
+  nav_msgs::msg::Path path;
+  path.header.frame_id = global_frame_;
+  while(active_node.prev && rclcpp::ok()) {
+    geometry_msgs::msg::Pose last_pose = gridToWorld(active_node);
+    geometry_msgs::msg::PoseStamped last_pose_stamped;
+    last_pose_stamped.header.frame_id = global_frame_;
+    last_pose_stamped.pose = last_pose;
+    path.poses.push_back(last_pose_stamped);
+    active_node = *active_node.prev;
   }
+  std::reverse(path.poses.begin(), path.poses.end());
 
-  std::vector<geometry_msgs::msg::PoseStamped> reversed;
-  for (int idx = goal_pool_index; idx != -1; idx = pool[idx].parent_index) {
-    double wx, wy;
-    costmap_->mapToWorld(pool[idx].x, pool[idx].y, wx, wy);
+  if(smooth_client_->action_server_is_ready()){
+    nav2_msgs::action::SmoothPath::Goal path_smooth;
+    path_smooth.path = path;
+    path_smooth.check_for_collisions = false;
+    path_smooth.smoother_id = "simple_smoother";
+    path_smooth.max_smoothing_duration.sec = 10;
+    auto future = smooth_client_->async_send_goal(path_smooth);
 
-    geometry_msgs::msg::PoseStamped pose;
-    pose.header = path.header;
-    pose.pose.position.x = wx;
-    pose.pose.position.y = wy;
-    pose.pose.orientation.w = 1.0;
-    reversed.push_back(pose);
-  }
-  std::reverse(reversed.begin(), reversed.end());
-
-  for (size_t i = 0; i < reversed.size(); ++i) {
-    if (i + 1 < reversed.size()) {
-      const double dx = reversed[i + 1].pose.position.x - reversed[i].pose.position.x;
-      const double dy = reversed[i + 1].pose.position.y - reversed[i].pose.position.y;
-      tf2::Quaternion q;
-      q.setRPY(0, 0, std::atan2(dy, dx));
-      reversed[i].pose.orientation = tf2::toMsg(q);
-    } else if (i > 0) {
-      reversed[i].pose.orientation = reversed[i - 1].pose.orientation;
+    if(future.wait_for(std::chrono::seconds(3)) == std::future_status::ready){
+      auto goal_handle = future.get();
+      if(goal_handle){
+        auto result_future = smooth_client_->async_get_result(goal_handle);
+        if(result_future.wait_for(std::chrono::seconds(3)) == std::future_status::ready){
+          auto result_path = result_future.get();
+          if(result_path.code == rclcpp_action::ResultCode::SUCCEEDED){
+            path = result_path.result->path;
+          }
+        }
+      }
     }
-    path.poses.push_back(reversed[i]);
   }
-
-  path.poses.front().pose.orientation = start.pose.orientation;
-  path.poses.back().pose.orientation = goal.pose.orientation;
-
+    
   return path;
+}
+
+double AStarPlanner::manhattanDistance(const GraphNode &node, const GraphNode &goal_node)
+{
+    return abs(node.x - goal_node.x) + abs(node.y - goal_node.y);
+}
+
+bool AStarPlanner::poseOnMap(const GraphNode & node)
+{
+    return node.x < static_cast<int>(costmap_->getSizeInCellsX()) && node.x >= 0 &&
+        node.y < static_cast<int>(costmap_->getSizeInCellsY()) && node.y >= 0;
+}
+
+GraphNode AStarPlanner::worldToGrid(const geometry_msgs::msg::Pose & pose)
+{
+    int grid_x = static_cast<int>((pose.position.x - costmap_->getOriginX()) / costmap_->getResolution());
+    int grid_y = static_cast<int>((pose.position.y - costmap_->getOriginY()) / costmap_->getResolution());
+    return GraphNode(grid_x, grid_y);
+}
+
+geometry_msgs::msg::Pose AStarPlanner::gridToWorld(const GraphNode & node)
+{
+    geometry_msgs::msg::Pose pose;
+    pose.position.x = node.x * costmap_->getResolution() + costmap_->getOriginX();
+    pose.position.y = node.y * costmap_->getResolution() + costmap_->getOriginY();
+    return pose;
+}
+
+unsigned int AStarPlanner::poseToCell(const GraphNode & node)
+{
+    return costmap_->getOriginX() * node.y + node.x;
 }
 
 }  // namespace auv_planning
