@@ -1,0 +1,45 @@
+controller_manager:
+
+  ros__parameters:
+
+    update_rate: 100
+    # enforce_command_limits: true
+
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    fin_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    thruster_controller:
+      type: forward_command_controller/ForwardCommandController
+
+
+
+
+
+joint_state_broadcaster:
+  ros__parameters:
+    publish_rate: 100
+
+
+
+fin_controller:
+  ros__parameters:
+    joints:
+      - Fin_Top_Joint
+      - Fin_Left_Joint
+      - Fin_Right_Joint
+      - Fin_Bottom_Joint
+
+    interface_name: position
+
+
+
+thruster_controller:
+  ros__parameters:
+    joints:
+      - T1_Joint
+
+    interface_name: velocity

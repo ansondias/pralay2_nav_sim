@@ -1,0 +1,6 @@
+joint_names:
+  - Fin_Top_Joint
+  - Fin_Left_Joint
+  - Fin_Bottom_Joint
+  - Fin_Right_Joint
+  - T1_Joint

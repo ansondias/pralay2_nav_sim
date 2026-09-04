@@ -1,0 +1,165 @@
+         <?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:arg name="use_ros2_control" default="true"/>
+    <!-- Passed in from robot.launch.py, computed there from .env's
+         JETSON_FILES_DIR (same source mission_handler.launch.py and
+         jetson_tcp_node_d_m.py already use) - one place to change the
+         path per machine instead of hardcoding it here. This default only
+         applies if the xacro is ever processed directly, without going
+         through robot.launch.py. -->
+    <xacro:arg name="loop_rate" default="100"/>
+    <xacro:arg name="budrate" default="1000000"/>
+    <xacro:arg name="timeout" default="50"/>
+    <xacro:arg name="device_id_master" default="/dev/stm32_1"/>
+    <xacro:arg name="device_id_imu" default="/dev/stm32_3"/>
+    <xacro:arg name="device_id_actuators" default="/dev/stm32_2"/>
+    <xacro:arg name="device_id_sensors" default="/dev/stm32_1"/>
+    <xacro:arg name="crash_log_dir" default="/home/gofloat/pralay2_ros2_isaacsim/jetson_files/controllers_crashes"/>
+    <ros2_control name="PralaySystem" type="system">
+        <!-- Old Arduino Mega fin/thruster board (superseded by propulsion_controller below, kept for reference). -->
+        <!-- <xacro:if value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>diffdrive_arduino/DiffDriveArduinoHardware</plugin>
+                <param name="loop_rate">30</param>
+                <param name="baud_rate">115200</param>
+                <param name="timeout_ms">1000</param>
+                <param name="device">/dev/serial/by-id/usb-Arduino__www.arduino.cc__0043_44236313735351F0C080-if00</param>
+                <param name="fin_top_min_range">-45</param>
+                <param name="fin_top_max_range">45</param>
+                <param name="fin_bottom_min_range">-45</param>
+                <param name="fin_bottom_max_range">45</param>
+                <param name="fin_left_min_range">-45</param>
+                <param name="fin_left_max_range">45</param>
+                <param name="fin_right_min_range">-45</param>
+                <param name="fin_right_max_range">45</param>
+                <param name="thruster_min_range">-100</param>
+                <param name="thruster_max_range">100</param>
+                <param name="pid_p">0</param>
+                <param name="pid_i">0</param>
+                <param name="pid_d">0</param>
+                <param name="pid_o">0</param>
+            </hardware>
+        </xacro:if> -->
+        <!-- propulsion_controller talked to system_2 directly over its own USB-serial
+             adapter; superseded now that the master aggregator board (see
+             circuit/stm32_frimware/master/master.ino) sits between the Jetson and
+             all three slave boards. Kept for standalone bench-testing system_2 alone. -->
+        <xacro:if value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>propulsion_controller/PropulsionControllerHardware</plugin>
+                <param name="loop_rate">$(arg loop_rate)</param>
+                <param name="baud_rate">$(arg budrate)</param>
+                <param name="timeout_ms">$(arg timeout)</param>
+                <param name="device">$(arg device_id_actuators)</param>
+                <param name="crash_log_dir">$(arg crash_log_dir)</param>
+            </hardware>
+        </xacro:if>
+        <!-- <xacro:if value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>master_controller/MasterControllerHardware</plugin>
+                <param name="loop_rate">100</param>
+                <param name="baud_rate">1000000</param>
+                <param name="timeout_ms">50</param>
+                <param name="device">/dev/serial/by-id/usb-STM32H750_master_board-if00</param>
+                <param name="crash_log_dir">$(arg crash_log_dir)</param>
+            </hardware>
+        </xacro:if> -->
+        <xacro:unless value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>mock_components/GenericSystem</plugin>
+            </hardware>
+        </xacro:unless>
+        <joint name="Fin_Top_Joint">
+            <command_interface name="position">
+                <!-- <param name="min">-0.7854</param>
+                <param name="max">0.7854</param> -->
+                <param name="min">-0.907571</param>
+                <param name="max">0.907571</param>
+            </command_interface>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+        <joint name="Fin_Left_Joint">
+            <command_interface name="position">
+                <param name="min">-0.907571</param>
+                <param name="max">0.907571</param>
+            </command_interface>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+        <joint name="Fin_Right_Joint">
+            <command_interface name="position">
+                <param name="min">-0.907571</param>
+                <param name="max">0.907571</param>
+            </command_interface>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+        <joint name="Fin_Bottom_Joint">
+            <command_interface name="position">
+                <param name="min">-0.907571</param>
+                <param name="max">0.907571</param>
+            </command_interface>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+        <joint name="T1_Joint">
+            <command_interface name="velocity">
+                <param name="min">-1.0</param>
+                <param name="max">1.0</param>
+            </command_interface>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+    </ros2_control>
+
+
+
+    
+    <!-- sensors2_controller talked to system_3 directly over its own USB-serial
+         adapter; superseded now that the master aggregator board sits between
+         the Jetson and all three slave boards (see PralaySystem above). Kept
+         for standalone bench-testing system_3 alone. -->
+    <ros2_control name="SensorSystem2" type="system">
+        <xacro:if value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>sensors2_controller/SensorsControllerHardware</plugin>
+                <param name="loop_rate">$(arg loop_rate)</param>
+                <param name="baud_rate">$(arg budrate)</param>
+                <param name="timeout_ms">$(arg timeout)</param>
+                <param name="device">$(arg device_id_sensors)</param>
+                <param name="crash_log_dir">$(arg crash_log_dir)</param>
+            </hardware>
+        </xacro:if>
+        <xacro:unless value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>mock_components/GenericSystem</plugin>
+            </hardware>
+        </xacro:unless>
+    </ros2_control>
+
+
+
+    
+    <!-- imu_controller talked to system_1 directly over its own USB-serial
+         adapter; superseded now that the master aggregator board sits between
+         the Jetson and all three slave boards (see PralaySystem above). Kept
+         for standalone bench-testing system_1 alone. -->
+    <ros2_control name="ImuSystem" type="system">
+        <xacro:if value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>imu_controller/ImuControllerHardware</plugin>
+                <param name="loop_rate">$(arg loop_rate)</param>
+                <param name="baud_rate">$(arg budrate)</param>
+                <param name="timeout_ms">$(arg timeout)</param>
+                <param name="device">$(arg device_id_imu)</param>
+                <param name="crash_log_dir">$(arg crash_log_dir)</param>
+            </hardware>
+        </xacro:if>
+        <xacro:unless value="$(arg use_ros2_control)">
+            <hardware>
+                <plugin>mock_components/GenericSystem</plugin>
+            </hardware>
+        </xacro:unless>
+    </ros2_control>
+</robot>

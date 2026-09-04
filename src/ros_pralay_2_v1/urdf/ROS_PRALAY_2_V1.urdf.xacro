@@ -1,0 +1,814 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ros_pralay_2_v1">
+      <xacro:arg name="use_ros2_control" default="true"/>
+
+      
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.0695761062294844 -9.48671346927477E-06 0.000877181801452732"
+        rpy="0 0 0" />
+      <mass
+        value="9.79712043227885" />
+      <inertia
+        ixx="0.0447126235666347"
+        ixy="3.94289693366845E-07"
+        ixz="-0.000145403305859678"
+        iyy="0.253973375427658"
+        iyz="-1.84761079624565E-07"
+        izz="0.254731789225581" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="Relay">
+    <inertial>
+      <origin
+        xyz="6.83463933226491E-08 4.92662147392475E-07 0.00355113921294595"
+        rpy="0 0 0" />
+      <mass
+        value="0.0721986810753826" />
+      <inertia
+        ixx="2.04784989278166E-05"
+        ixy="-5.11499199485322E-11"
+        ixz="1.47170550991599E-12"
+        iyy="1.92524275632253E-05"
+        iyz="3.47312728754813E-12"
+        izz="3.07027892657022E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Relay.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Relay.STL" />
+      </geometry>
+    </collision>
+  </link> 
+  <link
+    name="GPS">
+    <inertial>
+      <origin
+        xyz="-0.000174359402530189 -1.12797282974888E-16 -0.00901589082133974"
+        rpy="0 0 0" />
+      <mass
+        value="0.0342666933460838" />
+      <inertia
+        ixx="4.89018208757262E-06"
+        ixy="-2.44853196285097E-20"
+        ixz="-1.86912004033636E-08"
+        iyy="8.33574324345704E-06"
+        iyz="4.30697333592379E-20"
+        izz="1.14366924213395E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/GPS.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.250980392156863 0.250980392156863 0.250980392156863 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/GPS.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="NAV_light">
+    <inertial>
+      <origin
+        xyz="1.18349905278703E-06 -1.74010305023887E-06 0.0132550867310289"
+        rpy="0 0 0" />
+      <mass
+        value="0.0131155151362768" />
+      <inertia
+        ixx="1.63585932185847E-06"
+        ixy="3.44975534791283E-11"
+        ixz="-2.44298064699824E-10"
+        iyy="1.63597664802954E-06"
+        iyz="-4.71439991911305E-11"
+        izz="5.57734867669779E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/NAV_light.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/NAV_light.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link
+    name="DVL">
+    <inertial>
+      <origin
+        xyz="-0.00524431732304925 -1.35174434053205E-07 -0.00232114159379157"
+        rpy="0 0 0" />
+      <mass
+        value="0.0693659769689326" />
+      <inertia
+        ixx="1.72247163887539E-05"
+        ixy="1.00373591081006E-10"
+        ixz="2.74297481493299E-08"
+        iyy="2.00855236090643E-05"
+        iyz="-2.90019894644789E-12"
+        izz="3.34153197441074E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/DVL.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/DVL.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Depth_Sensor">
+    <inertial>
+      <origin
+        xyz="0 1.38161622729997E-20 -0.0061086776762856"
+        rpy="0 0 0" />
+      <mass
+        value="0.00323998658407695" />
+      <inertia
+        ixx="2.47080428194329E-07"
+        ixy="-9.99644539096066E-24"
+        ixz="1.57361070904428E-23"
+        iyy="2.47080428194329E-07"
+        iyz="3.36544284623507E-23"
+        izz="7.50116883920103E-08" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Depth_Sensor.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.250980392156863 0.250980392156863 0.250980392156863 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Depth_Sensor.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Fin_Top">
+    <inertial>
+      <origin
+        xyz="-0.0421800652503688 0.000240028269424186 0.0913440444102142"
+        rpy="0 0 0" />
+      <mass
+        value="0.261093809093477" />
+      <inertia
+        ixx="0.000424064486656722"
+        ixy="-2.76382339936417E-09"
+        ixz="7.79514426875884E-05"
+        iyy="0.000682563718535557"
+        iyz="1.36285655618386E-08"
+        izz="0.000270491233223645" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Top.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Top.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Fin_Left">
+    <inertial>
+      <origin
+        xyz="-0.0421800718169671 0.0913440469684711 -0.00024004287078554"
+        rpy="0 0 0" />
+      <mass
+        value="0.261093813486492" />
+      <inertia
+        ixx="0.000424064324658659"
+        ixy="7.79514857209155E-05"
+        ixz="2.76403041721111E-09"
+        iyy="0.000270491226108217"
+        iyz="-1.36456427720851E-08"
+        izz="0.000682563551710912" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Left.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Left.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Fin_Bottom">
+    <inertial>
+      <origin
+        xyz="-0.0421800482388229 -0.000240035606270037 -0.0913441037902421"
+        rpy="0 0 0" />
+      <mass
+        value="0.261094096502556" />
+      <inertia
+        ixx="0.00042406429585438"
+        ixy="2.76217017863878E-09"
+        ixz="-7.79514622426508E-05"
+        iyy="0.000682563527110738"
+        iyz="1.36444924375591E-08"
+        izz="0.000270491230036146" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Bottom.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Bottom.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Fin_Right">
+    <inertial>
+      <origin
+        xyz="-0.0421800718545086 -0.0913440469961033 0.000240042881606959"
+        rpy="0 0 0" />
+      <mass
+        value="0.261093813465297" />
+      <inertia
+        ixx="0.000424064324641104"
+        ixy="-7.79514856604083E-05"
+        ixz="-2.76403902495547E-09"
+        iyy="0.000270491226042404"
+        iyz="-1.36456356563039E-08"
+        izz="0.000682563551615187" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Right.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Fin_Right.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="T1">
+    <inertial>
+      <origin
+        xyz="0.0135142257403666 -1.92602336297741E-06 -2.9146721686151E-06"
+        rpy="0 0 0" />
+      <mass
+        value="0.0661321679007585" />
+      <inertia
+        ixx="6.59393410402782E-05"
+        ixy="-2.15009855598357E-09"
+        ixz="-3.39311609334925E-09"
+        iyy="4.21993779557645E-05"
+        iyz="1.57004485773318E-09"
+        izz="4.22029873716778E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/T1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/T1.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Front_DW">
+    <inertial>
+      <origin
+        xyz="-1.77635683940025E-15 -2.57363315967515E-16 -0.0105693590405256"
+        rpy="0 0 0" />
+      <mass
+        value="0.0928718542183865" />
+      <inertia
+        ixx="6.81295590492205E-05"
+        ixy="-4.03756699216532E-21"
+        ixz="2.92269126728774E-21"
+        iyy="2.00095854936661E-05"
+        iyz="8.79095622520496E-21"
+        izz="7.94642243542598E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Front_DW.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Front_DW.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Centre_DW">
+    <inertial>
+      <origin
+        xyz="-6.93889390390723E-18 -1.89321447037049E-17 -0.0105693590405539"
+        rpy="0 0 0" />
+      <mass
+        value="0.0928718542183867" />
+      <inertia
+        ixx="6.81295590492206E-05"
+        ixy="-2.63812048382479E-21"
+        ixz="-5.9250250619812E-21"
+        iyy="2.00095854936661E-05"
+        iyz="7.22780780491922E-21"
+        izz="7.946422435426E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Centre_DW.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Centre_DW.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="Rear_DW">
+    <inertial>
+      <origin
+        xyz="-1.15557833353844E-16 -0.0605693590405578 1.11022302462516E-16"
+        rpy="0 0 0" />
+      <mass
+        value="0.0928718542183865" />
+      <inertia
+        ixx="2.00095854936661E-05"
+        ixy="-5.54017674895535E-21"
+        ixz="5.03637646139913E-21"
+        iyy="7.94642243542599E-05"
+        iyz="1.64281792080161E-21"
+        izz="6.81295590492206E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Rear_DW.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/Rear_DW.STL" />
+      </geometry>
+    </collision>
+  </link>
+<link
+    name="IMU">
+    <inertial>
+      <origin
+        xyz="-9.2148511043888E-15 2.3922300293036E-17 -0.0025"
+        rpy="0 0 0" />
+      <mass
+        value="0.00308" />
+      <inertia
+        ixx="1.30643333333333E-07"
+        ixy="9.87041836114139E-22"
+        ixz="-1.30699345824829E-21"
+        iyy="2.07643333333334E-07"
+        iyz="-1.22053361918098E-21"
+        izz="3.25453333333334E-07" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/IMU.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://ros_pralay_2_v1/meshes/IMU.STL" />
+      </geometry>
+    </collision>
+  </link>
+
+
+
+
+
+  <joint
+    name="Relay_Joint"
+    type="fixed">
+    <origin
+      xyz="0.958335678874898 0 0.0880385961079187"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Relay" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="GPS_Joint"
+    type="fixed">
+    <origin
+      xyz="0.884351257994062 0 0.257000000000018"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="GPS" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="NAV_light_Joint"
+    type="fixed">
+    <origin
+      xyz="0.207899900987213 0 0.0882500000000149"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="NAV_light" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="DVL_Joint"
+    type="fixed">
+    <origin
+      xyz="0.388556867506674 -0.000335044692236923 -0.130006547832249"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="DVL" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="Depth_Sensor_Joint"
+    type="fixed">
+    <origin
+      xyz="0.137899900987215 0 0.072000000000015"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Depth_Sensor" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="Fin_Top_Joint"
+    type="revolute">
+    <origin
+      xyz="-0.82585 0 0.0595"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Fin_Top" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-0.907571"
+      upper="0.907571"
+      effort="10"
+      velocity="2" />
+  </joint>
+  <joint
+    name="Fin_Left_Joint"
+    type="revolute">
+    <origin
+      xyz="-0.82585 0.0595 0"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Fin_Left" />
+    <axis
+      xyz="0 1 0" />
+    <limit
+      lower="-0.907571"
+      upper="0.907571"
+      effort="10"
+      velocity="2" />
+  </joint>
+  <joint
+    name="Fin_Bottom_Joint"
+    type="revolute">
+    <origin
+      xyz="-0.82585 0 -0.0595"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Fin_Bottom" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-0.907571"
+      upper="0.907571"
+      effort="10"
+      velocity="2" />
+  </joint>
+  <joint
+    name="Fin_Right_Joint"
+    type="revolute">
+    <origin
+      xyz="-0.82585 -0.0595 0"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Fin_Right" />
+    <axis
+      xyz="0 -1 0" />
+    <limit
+      lower="-0.907571"
+      upper="0.907571"
+      effort="10"
+      velocity="2" />
+  </joint>
+  <joint
+    name="T1_Joint"
+    type="continuous">
+    <origin
+      xyz="-1.1433 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="T1" />
+    <axis
+      xyz="-1 0 0" />
+  </joint>
+  <joint
+    name="Front_DW_Joint"
+    type="fixed">
+    <origin
+      xyz="0.85499 0 -0.05"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Front_DW" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="Centre_DW_Joint"
+    type="fixed">
+    <origin
+      xyz="-0.0235 0 -0.05"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="Centre_DW" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="Rear_DW_Joint"
+    type="fixed">
+    <origin
+      xyz="-0.902 0 0"
+      rpy="1.5708 0 -1.5708" />
+    <parent
+      link="base_link" />
+    <child
+      link="Rear_DW" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <joint
+    name="IMU_Link"
+    type="fixed">
+    <origin
+      xyz="-0.3876 0 0.025793"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="IMU" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
+  <xacro:include filename="$(find ros_pralay_2_v1)/urdf/ros2_control.urdf.xacro"/>
+</robot>

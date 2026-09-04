@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+
+  <name>ros_pralay_2_v1</name>
+  <version>1.0.0</version>
+
+  <description>
+    URDF description package for ROS_PRALAY_2_V1 robot
+  </description>
+
+  <maintainer email="your@email.com">
+    Pankaj
+  </maintainer>
+
+  <license>BSD</license>
+
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>
