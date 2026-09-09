@@ -73,6 +73,39 @@ private:
   std::string global_frame_, name_;
   double water_current_speed_;
   double water_current_direction_north_;
+  double auv_cruise_speed_{1.0};
+  double current_cost_weight_{1.0};
+  double obstacle_cost_weight_{3.0};
+  int lethal_cost_threshold_{99};
+
+  // Kinematic search (see createPlan). The vehicle is fin-steered and
+  // cannot turn tighter than minimum_turning_radius_, so the search carries
+  // a heading and expands along arcs of that radius instead of stepping
+  // between grid cells. Must match controller_server.FollowPath's
+  // min_turning_radius in auv_navigation/config/nav2_params.yaml and
+  // auv_current_plugin::ThrustControl's clamp.
+  double minimum_turning_radius_{4.16};
+  // Arc length of one motion primitive, m. Longer is faster to search and
+  // coarser; it must stay well under the turning radius or a single
+  // primitive sweeps too much heading to collision-check sensibly.
+  double primitive_length_{1.0};
+  // Heading discretisation used only to decide when two states are "the
+  // same" for the closed set. Too few and genuinely different headings get
+  // merged; too many and the search never converges on a cell.
+  int heading_bins_{36};
+  // How close (m) the search has to get to the goal position. A vehicle
+  // with a 4 m turning circle cannot hit a point exactly, and Nav2's goal
+  // checker is 2 m anyway.
+  double goal_tolerance_{1.0};
+  // Safety valve so a hopeless goal fails in bounded time instead of
+  // starving the 1 Hz replanning loop.
+  int max_expansions_{200000};
+  // Smoothing is off by default now: the arcs the search emits already
+  // respect the turning radius, and simple_smoother would pull curvature
+  // back below it.
+  bool smooth_path_{false};
+  // One warning per plan when the start is inside the inflated zone.
+  mutable bool escaping_logged_{false};
 
   rclcpp_action::Client<nav2_msgs::action::SmoothPath>::SharedPtr smooth_client_;
 
@@ -85,6 +118,35 @@ private:
   unsigned int poseToCell(const GraphNode & node);
 
   double manhattanDistance(const GraphNode &node, const GraphNode &goal_node);
+
+  // A pose in the kinematic search: continuous position and heading, so
+  // arcs are not quantised to the grid. The grid is only used for
+  // collision checking and for the closed set.
+  struct State
+  {
+    double x{0.0};
+    double y{0.0};
+    double yaw{0.0};
+  };
+
+  // Cost of travelling `arc_length` metres in world direction (dir_x, dir_y),
+  // in metres of "equivalent distance": the length scaled by the travel-time
+  // effect of the water current, plus a penalty for the costmap cost of the
+  // cells crossed. See a_star_planner.cpp.
+  double arcCost(double dir_x, double dir_y, double arc_length, unsigned char cell_cost) const;
+
+  // Admissible heuristic: straight-line distance scaled by the best-case
+  // (fully with-current) multiplier. Ignores the turning constraint, which
+  // only ever makes the true path longer, so it stays admissible.
+  double heuristic(const State & state, double goal_x, double goal_y) const;
+
+  // True if every sampled point along the arc from `from`, turning at
+  // `curvature` (1/m, 0 = straight) for `arc_length` metres, is on the map
+  // and below the lethal cost threshold. Writes the arc's end pose to `end`
+  // and the worst cell cost encountered to `worst_cost`.
+  bool arcIsClear(
+    const State & from, double curvature, double arc_length,
+    State & end, unsigned char & worst_cost, unsigned char threshold) const;
 };
 
 }  // namespace auv_planning

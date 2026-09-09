@@ -13,6 +13,8 @@ find_package(rclpy REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_util REQUIRED)
@@ -29,6 +31,8 @@ set(dependencies
   nav_msgs
   geometry_msgs
   tf2_ros
+  tf2
+  tf2_geometry_msgs
   nav2_core
   nav2_costmap_2d
   nav2_util

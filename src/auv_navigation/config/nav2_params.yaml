@@ -15,6 +15,10 @@ bt_navigator:
     default_server_timeout: 1000
     wait_for_service_timeout: 1000
     action_server_result_timeout: 900.0
+    # Fin-steered AUV: no Spin recovery (it can't rotate in place). The
+    # placeholder path below is rewritten to the installed file by
+    # auv_navigation/launch/navigation.launch.py.
+    default_nav_to_pose_bt_xml: "navigate_to_pose_auv.xml"
     navigators: ["navigate_to_pose", "navigate_through_poses"]
     navigate_to_pose:
       plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
@@ -43,50 +47,65 @@ controller_server:
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.3
-      yaw_goal_tolerance: 0.3
+      # Loosened from 0.3/0.3: the AUV is Ackermann-steered (min_turning_radius
+      # 4.16m, can't rotate in place -- see FollowPath below) and 2.4m long,
+      # so it can't reliably hit a tight final position/heading the way a
+      # holonomic or in-place-rotating robot could. yaw_goal_tolerance of
+      # ~pi means heading at the goal is effectively unconstrained, since
+      # there's no way to guarantee a specific final heading without
+      # in-place rotation anyway.
+      # 2.0 m, not 1.0: with a 4.16 m minimum turning radius a missed 1 m
+      # circle can't be re-entered without a full loop -- the controller
+      # then circles the goal ("rotating on a point" from the outside).
+      xy_goal_tolerance: 2.0
+      yaw_goal_tolerance: 3.14
 
-    # Default nav2 controller (DWB), unmodified: only the GridBased global
-    # planner plugin below is swapped out for auv_planning::AStarPlanner.
+    # The AUV is Ackermann-steered (fin/rudder steering, not thrust-vectored):
+    # it cannot rotate in place or strafe, and has a minimum turning radius
+    # coupled to forward speed. DWB doesn't model that constraint (it happily
+    # samples in-place rotations), so FollowPath uses Nav2's Regulated Pure
+    # Pursuit Controller instead -- the standard Nav2 controller for
+    # car-like/Ackermann vehicles. min_turning_radius/use_rotate_to_heading
+    # below must match the kinematic clamp applied in
+    # auv_current_plugin::ThrustControl (auv.gazebo.xacro) and the
+    # commit -- both derive from the same hull_length=2.4m in
+    # auv_description/urdf/auv.urdf.xacro and a ~30 deg max fin deflection:
+    # min_turning_radius = hull_length / tan(30 deg) ~= 4.16 m.
+    #
+    # Top speed: 4 kn = 4 * 0.514444 m/s ~= 2.06 m/s.
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: True
-      min_vel_x: -0.35
-      min_vel_y: 0.0
-      max_vel_x: 0.5
-      max_vel_y: 0.0
-      max_vel_theta: 1.0
-      min_speed_xy: 0.0
-      max_speed_xy: 0.5
-      min_speed_theta: 0.0
-      acc_lim_x: 1.0
-      acc_lim_y: 0.0
-      acc_lim_theta: 2.0
-      decel_lim_x: -1.0
-      decel_lim_y: 0.0
-      decel_lim_theta: -2.0
-      vx_samples: 20
-      vy_samples: 1
-      vtheta_samples: 20
-      sim_time: 1.5
-      linear_granularity: 0.05
-      angular_granularity: 0.025
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 2.06
+      max_linear_accel: 1.0
+      max_linear_decel: 1.0
+      # Lookahead of the order of the turning radius: pure pursuit with a
+      # carrot much closer than min_turning_radius asks for curvature the
+      # hull can't produce and it S-turns / overshoots. Velocity-scaled
+      # between 2 and 6 m (lookahead_time 2 s at up to 2.06 m/s).
+      lookahead_dist: 3.0
+      min_lookahead_dist: 2.0
+      max_lookahead_dist: 6.0
+      lookahead_time: 2.0
+      use_velocity_scaled_lookahead_dist: true
+      min_approach_linear_velocity: 0.3
+      approach_velocity_scaling_dist: 3.0
+      use_collision_detection: true
+      max_allowed_time_to_collision_up_to_carrot: 1.0
+      use_regulated_linear_velocity_scaling: true
+      use_cost_regulated_linear_velocity_scaling: false
+      regulated_linear_scaling_min_radius: 0.9
+      regulated_linear_scaling_min_speed: 0.25
+      # Ackermann/car-like vehicles can't rotate in place at the goal, so
+      # this must stay false -- that's also what makes RPP honor
+      # min_turning_radius instead of assuming free in-place rotation.
+      use_rotate_to_heading: false
+      max_angular_accel: 2.0
+      max_robot_pose_search_dist: 10.0
+      min_turning_radius: 4.16
+      use_fixed_curvature_lookahead: false
       transform_tolerance: 0.2
-      xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.25
-      short_circuit_trajectory_evaluation: True
+      xy_goal_tolerance: 2.0
       stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      GoalAlign.scale: 24.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
 
 local_costmap:
   local_costmap:
@@ -100,15 +119,21 @@ local_costmap:
       width: 10
       height: 10
       resolution: 0.2
-      robot_radius: 0.3
+      # The hull is 2.41 m long: model it as its circumscribed circle
+      # (half-length 1.2 m) rather than the old 0.3 m point, and inflate
+      # well beyond it. With cost_scaling 1.5 the planner's "blocked"
+      # threshold (cost >= 99) sits ~1.8 m from an obstacle edge, so the bow
+      # and stern stay clear even mid-turn; 0.3/0.55 let paths hug reefs at
+      # 0.6 m and the hull swept into them.
+      robot_radius: 1.2
       # No onboard obstacle sensor in this sandbox yet (no sonar/lidar
       # bridged): the local costmap only inflates around the static map's
       # obstacles. Add an obstacle_layer here once a ranging sensor exists.
       plugins: ["inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+        cost_scaling_factor: 1.5
+        inflation_radius: 2.0
       always_send_full_costmap: True
 
 global_costmap:
@@ -119,7 +144,7 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      robot_radius: 0.3
+      robot_radius: 1.2      # see local_costmap: hull half-length
       resolution: 0.2
       track_unknown_space: true
       plugins: ["static_layer", "inflation_layer"]
@@ -129,8 +154,8 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+        cost_scaling_factor: 1.5
+        inflation_radius: 2.0
       always_send_full_costmap: True
 
 planner_server:
@@ -141,10 +166,43 @@ planner_server:
 
     # Custom global planner: current-aware A* from the auv_planning
     # package. Everything else in this file is stock nav2 default config.
+    # These two values must match auv_current_plugin::OceanCurrent's
+    # <speed>/<direction_north_deg> in auv_description/urdf/auv.gazebo.xacro;
+    # the sim and the planner are not wired together automatically, so the
+    # current has to be told to both by hand. 0.3 m/s (~0.6 kn) is a typical
+    # average open-ocean Indian Ocean current speed (South Equatorial
+    # Current), well below boundary-current extremes like the Somali
+    # Current (up to ~3.6 m/s); direction 135 deg is an arbitrary scenario
+    # bearing, not tied to a real location/season. (The sim's current now
+    # also varies with depth and a monsoon cycle -- see ocean_current.hpp --
+    # so this is only ever an approximation of what's applied at a given
+    # moment.)
     GridBased:
       plugin: "auv_planning::AStarPlanner"
-      water_current_speed: 0.0
-      water_current_direction_north: 0.0
+      water_current_speed: 0.3
+      water_current_direction_north: 135.0
+      # Cruise speed the current is compared against (m/s) and how strongly
+      # the current biases the search (0 = plain A*, 1 = full travel-time
+      # model). See auv_planning/src/a_star_planner.cpp.
+      auv_cruise_speed: 1.0
+      current_cost_weight: 1.0
+      # Cells with costmap cost >= this are impassable (inflated zone).
+      lethal_cost_threshold: 99
+      # Kinematic search: the planner carries a heading and expands along
+      # arcs of this radius, so the path it returns is one the hull can
+      # actually drive. Must equal controller_server.FollowPath's
+      # min_turning_radius above and the clamp in
+      # auv_current_plugin::ThrustControl. Without this the search emitted
+      # grid corners far tighter than the hull can turn, the controller
+      # swung wide of them, and the vehicle hit obstacles.
+      minimum_turning_radius: 4.16
+      primitive_length: 1.0
+      heading_bins: 36
+      goal_tolerance: 1.0
+      max_expansions: 200000
+      # Leave off: the arcs already respect the turning radius, and
+      # simple_smoother would pull curvature back below it.
+      smooth_path: false
 
 smoother_server:
   ros__parameters:
@@ -196,8 +254,13 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.0, 1.0]
-    min_velocity: [-0.35, 0.0, -1.0]
+    # x: 4 kn top speed (2.06 m/s); theta: v/min_turning_radius = 2.06/4.16,
+    # the max yaw rate achievable at top speed given FollowPath's
+    # min_turning_radius (see controller_server.FollowPath above). Reverse
+    # x is a conservative straight-line-only allowance for the "backup"
+    # recovery behavior -- Ackermann reverse steering isn't modeled.
+    max_velocity: [2.06, 0.0, 0.5]
+    min_velocity: [-0.5, 0.0, -0.5]
     max_accel: [1.0, 0.0, 2.0]
     max_decel: [-1.0, 0.0, -2.0]
     odom_topic: "/odometry/filtered"

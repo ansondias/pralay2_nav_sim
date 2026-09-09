@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import math
+
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import OccupancyGrid, Path
@@ -48,6 +50,26 @@ class AStarPlanner(Node):
 
         self.map_ = None
         self.visited_map_ = OccupancyGrid()
+
+        # Water current at the AUV's fixed operating depth (1 m). This is a
+        # single scalar current, not a depth-varying field: the planner only
+        # ever sees a flat 2D costmap for that depth, so "the current" here
+        # means "the current at 1 m," set once via these params -- it cannot
+        # change with depth or position without a different map/costmap per
+        # depth band.
+        self.declare_parameter("water_current_speed", 0.0)
+        self.declare_parameter("water_current_direction_north", 0.0)
+        self.declare_parameter("current_cost_weight", 0.5)
+        self.water_current_speed = self.get_parameter("water_current_speed").value
+        self.water_current_direction_north = self.get_parameter(
+            "water_current_direction_north"
+        ).value
+        self.current_cost_weight = self.get_parameter("current_cost_weight").value
+        self.get_logger().info(
+            f"AStarPlanner: water_current_speed={self.water_current_speed:.2f} m/s, "
+            f"water_current_direction_north={self.water_current_direction_north:.1f} deg, "
+            f"current_cost_weight={self.current_cost_weight:.2f}"
+        )
 
     def map_callback(self, map_msg: OccupancyGrid):
         self.map_ = map_msg
@@ -109,7 +131,8 @@ class AStarPlanner(Node):
                 if (new_node not in visited_nodes and self.pose_on_map(new_node) and 
                     0 <= self.map_.data[self.pose_to_cell(new_node)] < 99):
                     
-                    new_node.cost = active_node.cost + 1 + self.map_.data[self.pose_to_cell(new_node)]
+                    step_cost = self.current_cost_multiplier(dir_x, dir_y)
+                    new_node.cost = active_node.cost + step_cost + self.map_.data[self.pose_to_cell(new_node)]
                     new_node.heuristic = self.manhattan_distance(new_node, goal_node)
                     new_node.prev = active_node
 
@@ -131,6 +154,29 @@ class AStarPlanner(Node):
 
         path.poses.reverse()
         return path
+
+    def current_cost_multiplier(self, dx, dy):
+        """Cost scale for a step (dx, dy): <1 with the 1 m-depth current, >1 against it."""
+        if self.water_current_speed <= 0.0 or (dx == 0 and dy == 0):
+            return 1.0
+
+        # World frame is ENU (+X east, +Y north); direction_north is the
+        # compass bearing the current flows toward, same convention as the
+        # C++ AStarPlanner / auv_current_plugin so params can be shared.
+        theta = math.radians(self.water_current_direction_north)
+        current_x = math.sin(theta)
+        current_y = math.cos(theta)
+
+        step_len = math.hypot(dx, dy)
+        step_x = dx / step_len
+        step_y = dy / step_len
+
+        # +1 = moving with the current, -1 = moving straight into it.
+        alignment = step_x * current_x + step_y * current_y
+
+        strength = math.tanh(self.water_current_speed) * self.current_cost_weight
+        multiplier = 1.0 - strength * alignment
+        return min(max(multiplier, 0.2), 2.0)
 
     def manhattan_distance(self, node: GraphNode, goal_node: GraphNode):
         return abs(node.x - goal_node.x) + abs(node.y - goal_node.y)
