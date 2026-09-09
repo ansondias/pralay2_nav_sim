@@ -1,23 +1,56 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Treat the AUV as already neutrally buoyant and holding a fixed
-       cruising depth: no vertical gravity, no buoyancy engine to tune.
-       Horizontal motion is what's being tested (currents + planning),
-       so this keeps the sim lightweight and robust; see auv_gazebo/README. -->
+  <!-- Real hydrostatics: gravity is on, and auv_current_plugin::Buoyancy
+       below supplies the counteracting upward force plus a metacentric
+       righting moment (from a center-of-buoyancy offset above the center
+       of gravity), so the hull has genuine pitch/roll/heave dynamics
+       instead of the old "gravity disabled, always neutrally buoyant by
+       fiat" shortcut. hull_mass in auv_description/urdf/auv.urdf.xacro is
+       derived to make this near-neutral by construction; residual
+       imbalance (approximated hull_volume, no exact ballast trim) is
+       expected and realistic: real AUVs are trimmed, not exactly
+       neutral either. Nav2/the EKF (auv_localization/config/ekf.yaml,
+       two_d_mode: true) still deliberately ignore Z/roll/pitch: this adds
+       physical realism to the sim, not 3D localization/planning; see
+       auv_gazebo/README. -->
   <gazebo reference="base_link">
-    <gravity>false</gravity>
+    <gravity>true</gravity>
+  </gazebo>
+
+  <!-- See the gravity comment above: this is what makes gravity=true not
+       just sink the hull. center_of_buoyancy_offset_z is a modest assumed
+       margin, not a measured value; see buoyancy.hpp. -->
+  <gazebo>
+    <plugin filename="buoyancy" name="auv_current_plugin::Buoyancy">
+      <link_name>base_link</link_name>
+      <fluid_density>${fluid_density}</fluid_density>
+      <hull_volume>${hull_volume}</hull_volume>
+      <!-- g is read from the world so weight and buoyancy cancel exactly.
+           Single link with its CoM at the origin, so the CoB is simply
+           3 cm straight above the origin (base_link frame). -->
+      <center_of_buoyancy>0 0 0.03</center_of_buoyancy>
+    </plugin>
   </gazebo>
 
   <!-- cmd_vel -> a body-frame thrust force/torque applied directly to the
        hull. DiffDrive won't work here: it moves a robot via simulated
        wheel-to-ground friction, and this AUV never touches the ground
-       (gravity disabled, floating at a fixed depth). gz-sim's
+       (gravity now balanced by auv_current_plugin::Buoyancy above, not
+       disabled; see that plugin's comment). gz-sim's
        VelocityControl system would work depth-wise but *overwrites* the
        model's velocity every tick, silently cancelling
        auv_current_plugin::OceanCurrent's drag force; ThrustControl
        applies a force instead, so thrust and current genuinely combine
-       through physics. -->
+       through physics.
+
+       Vehicle is Ackermann-steered (fin/rudder, not thrust-vectored): rated
+       for 4 kn (2.06 m/s) top speed, and yaw rate is clamped to what a
+       min_turning_radius_ turn allows at the current speed; it cannot
+       rotate in place. min_turning_radius (4.16 m) = hull_length (2.4 m,
+       auv_description/urdf/auv.urdf.xacro) / tan(30 deg max fin
+       deflection). Must match controller_server.FollowPath.min_turning_radius
+       in auv_navigation/config/nav2_params.yaml. -->
   <gazebo>
     <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
       <link_name>base_link</link_name>
@@ -29,6 +62,24 @@
       <angular_gain>0.5</angular_gain>
       <max_force>200.0</max_force>
       <max_torque>20.0</max_torque>
+      <max_linear_speed>2.06</max_linear_speed>
+      <min_turning_radius>4.16</min_turning_radius>
+      <!-- Depth autopilot: holds the spawn depth (and integrates
+           cmd_vel.linear.z). Critically damped for an ~11-50 kg hull:
+           omega = sqrt(20/m), zeta ~ 30 / (2 sqrt(20 m)). Without it the
+           hull drifts a few mm/s in heave from any sub-newton imbalance,
+           since nothing else regulates depth once gravity is real. -->
+      <depth_hold>true</depth_hold>
+      <depth_gain>20.0</depth_gain>
+      <depth_damping>30.0</depth_damping>
+      <max_vertical_force>30.0</max_vertical_force>
+      <max_vertical_speed>0.5</max_vertical_speed>
+      <!-- Treat cmd_vel as zero after this long without a message. -->
+      <cmd_timeout>1.0</cmd_timeout>
+      <!-- Absolute depth setpoints (m below this surface; must match
+           OceanCurrent's surface_z) arrive on /model/<name>/depth_setpoint,
+           bridged from ROS /depth_setpoint (std_msgs/Float64). -->
+      <surface_z>5.0</surface_z>
     </plugin>
   </gazebo>
 
@@ -57,17 +108,37 @@
     </sensor>
   </gazebo>
 
-  <!-- Horizontal ocean current drag force. speed/direction default to 0
-       here and are meant to be set per-scenario from the world file or
-       live over /model/auv/ocean_current; see auv_gazebo/worlds. -->
+  <!-- Ocean current drag force, now with depth-dependent strength and a
+       monsoon-driven seasonal cycle; see ocean_current.hpp for the full
+       model. This must be a gazebo block on the model (not a world-level
+       plugin): OceanCurrent::Configure() requires a valid gz::sim::Model(entity)
+       and silently no-ops otherwise, so a world-level instance never
+       applies any force.
+
+       speed/direction_north_deg are the manual-override fallback, live-
+       settable over /model/auv/ocean_current (see auv_gazebo/README.md);
+       only actually used while enable_monsoon_cycle is false, since the
+       monsoon cycle drives the current whenever it's on. axial/lateral
+       area come from auv_description/urdf/auv.urdf.xacro's hull dimensions;
+       update the hull there, not here, if it's resized. -->
   <gazebo>
     <plugin filename="ocean_current" name="auv_current_plugin::OceanCurrent">
       <link_name>base_link</link_name>
-      <speed>0.0</speed>
-      <direction_north_deg>0.0</direction_north_deg>
-      <drag_coefficient>1.0</drag_coefficient>
-      <fluid_density>1025</fluid_density>
-      <cross_section_area>0.3</cross_section_area>
+      <speed>0.3</speed>
+      <direction_north_deg>135.0</direction_north_deg>
+      <axial_drag_coefficient>0.3</axial_drag_coefficient>
+      <lateral_drag_coefficient>1.2</lateral_drag_coefficient>
+      <axial_area>${hull_frontal_area}</axial_area>
+      <lateral_area>${hull_lateral_area}</lateral_area>
+      <fluid_density>${fluid_density}</fluid_density>
+      <surface_z>5.0</surface_z>
+      <current_depth_decay_scale>10.0</current_depth_decay_scale>
+      <enable_monsoon_cycle>true</enable_monsoon_cycle>
+      <monsoon_period_sec>120.0</monsoon_period_sec>
+      <sw_monsoon_speed>0.6</sw_monsoon_speed>
+      <sw_monsoon_direction_deg>45.0</sw_monsoon_direction_deg>
+      <ne_monsoon_speed>0.25</ne_monsoon_speed>
+      <ne_monsoon_direction_deg>225.0</ne_monsoon_direction_deg>
     </plugin>
   </gazebo>
 

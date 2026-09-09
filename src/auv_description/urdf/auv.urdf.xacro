@@ -1,9 +1,29 @@
 <?xml version="1.0"?>
 <robot name="auv" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:property name="hull_radius" value="0.15"/>
-  <xacro:property name="hull_length" value="1.2"/>
-  <xacro:property name="hull_mass" value="20.0"/>
+  <!-- 2.4 m long, 16 cm diameter hull. hull_mass is *derived* below from
+       hull_volume at neutral-buoyancy density, not an independent number;
+       update hull_radius/hull_length here and every dependent quantity
+       (mass, inertia, frontal/lateral area, buoyant volume) recomputes
+       consistently. If a real measured mass is known, hardcode hull_mass
+       instead and accept the vehicle will be slightly non-neutrally-buoyant
+       (realistic: most real AUVs are trimmed, not exactly neutral). -->
+  <xacro:property name="M_PI" value="3.14159265358979"/>
+  <xacro:property name="hull_radius" value="0.08"/>
+  <xacro:property name="hull_length" value="2.4"/>
+  <!-- kg/m^3, nominal seawater; shared with auv_current_plugin::OceanCurrent
+       and ::Buoyancy in auv.gazebo.xacro so all three stay consistent. -->
+  <xacro:property name="fluid_density" value="1025.0"/>
+  <!-- Frontal (nose-on) circle: for OceanCurrent's axial_area. -->
+  <xacro:property name="hull_frontal_area" value="${M_PI * hull_radius * hull_radius}"/>
+  <!-- Broadside length x diameter rectangle: for OceanCurrent's lateral_area. -->
+  <xacro:property name="hull_lateral_area" value="${hull_length * 2 * hull_radius}"/>
+  <!-- Cylinder + 2 hemispherical end caps (= 1 full sphere): for Buoyancy's
+       hull_volume. -->
+  <xacro:property name="hull_volume"
+    value="${M_PI * hull_radius * hull_radius * hull_length
+            + (4.0 / 3.0) * M_PI * hull_radius * hull_radius * hull_radius}"/>
+  <xacro:property name="hull_mass" value="${fluid_density * hull_volume}"/>
 
   <!-- ============ base ============ -->
   <link name="base_link">
