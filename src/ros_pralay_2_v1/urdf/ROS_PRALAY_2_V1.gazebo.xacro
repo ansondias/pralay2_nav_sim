@@ -1,0 +1,224 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Gazebo (gz-sim Harmonic) side of the real Pralay-2 hull. Included by
+       ROS_PRALAY_2_V1.urdf.xacro only when sim_mode:=true. This mirrors
+       auv_description/urdf/auv.gazebo.xacro (the placeholder torpedo) so the
+       rest of the sandbox - ros_gz bridge (auv_gazebo/config/bridge.yaml),
+       the EKF (auv_localization/config/ekf.yaml), Nav2 - sees the same
+       topics and frames: /cmd_vel in, /dvl_odom + /imu/data out,
+       base_link as the body frame. What differs is everything that
+       depends on the hull: mass, volume, drag areas, sensor link names,
+       and the ros2_control joints (fins + propeller) that the placeholder
+       never had. -->
+
+  <!-- ============ hull numbers ============ -->
+  <!-- Nominal seawater; must match OceanCurrent/Buoyancy below. -->
+  <xacro:property name="fluid_density" value="1025.0"/>
+  <!-- Total vehicle mass = the sum of every <mass> in
+       ROS_PRALAY_2_V1.urdf.xacro (base_link 9.797 + 4 fins x 0.261 + 3 dead
+       weights x 0.093 + relay/GPS/nav light/DVL/depth/IMU/T1 small parts).
+       Buoyancy acts on base_link only but has to carry the whole model, so
+       it is sized from the total, not base_link's own mass. Keep all the
+       digits: rounding to 11.381 left the hull 0.005 N heavy, which with
+       nothing else acting in heave is a steady ~3 mm/s sink. Re-sum this if
+       the SolidWorks export changes. -->
+  <xacro:property name="vehicle_mass" value="11.3815"/>
+  <!-- Displaced volume that makes the vehicle exactly neutrally buoyant.
+       The real hull is trimmed slightly positive; add a few percent here
+       to reproduce that (the hull then rises slowly when unpowered). -->
+  <xacro:property name="displaced_volume" value="${vehicle_mass / fluid_density}"/>
+  <!-- Composite centre of gravity of the whole export in the base_link
+       frame: sum(m_i * p_i) / sum(m_i) over every link, with each link's
+       <inertial> origin pushed through its joint origin. Tail-heavy, because
+       the four fins + propeller (1.1 kg) sit ~0.9 m aft of the hull's own
+       CoM. Buoyancy has to act directly above THIS point, not above the
+       link origin, or the hull pitches nose-up (first test run: ~80 deg).
+       Re-run the sum if the SolidWorks export changes. -->
+  <xacro:property name="vehicle_cog_x" value="-0.1354"/>
+  <xacro:property name="vehicle_cog_y" value="0.0"/>
+  <xacro:property name="vehicle_cog_z" value="0.0"/>
+  <!-- Metacentric margin: CoB this far above the composite CoG. 3 cm is an
+       assumed value (dead weights hang below the centreline, so the real
+       CoB is above the CoG), not a measured one. -->
+  <xacro:property name="cob_above_cog" value="0.03"/>
+  <!-- Frontal / broadside areas from hull_length and hull_radius
+       (properties set in ROS_PRALAY_2_V1.urdf.xacro from the mesh bbox). -->
+  <xacro:property name="M_PI" value="3.14159265358979"/>
+  <xacro:property name="hull_frontal_area" value="${M_PI * hull_radius * hull_radius}"/>
+  <xacro:property name="hull_lateral_area" value="${hull_length * 2 * hull_radius}"/>
+  <!-- Kinematic limits shared with Nav2. min_turning_radius here MUST equal
+       controller_server.FollowPath.min_turning_radius in
+       auv_navigation/config/nav2_params.yaml (4.16 m, derived there from a
+       30 deg effective fin deflection). The URDF's fin joints allow +-52 deg
+       (0.9076 rad), which would give ~1.9 m; the tighter value is kept on
+       purpose until Nav2 is retuned - change both together. -->
+  <xacro:property name="max_linear_speed" value="2.06"/>
+  <xacro:property name="min_turning_radius" value="4.16"/>
+
+  <!-- Gravity on; auv_current_plugin::Buoyancy supplies the counter-force. -->
+  <gazebo reference="base_link">
+    <gravity>true</gravity>
+  </gazebo>
+
+  <!-- ============ ros2_control (fins + propeller) ============ -->
+  <!-- gz_ros2_control hosts the controller_manager *inside* gz-sim: the
+       hardware is the <ros2_control name="PralaySystem"> block in
+       ros2_control.urdf.xacro (GazeboSimSystem when sim_mode). Controllers
+       come from auv_control's YAML; start them with
+       `ros2 launch auv_control controllers.launch.py sim:=true` (spawners
+       only - no separate ros2_control_node, it would fight this one). -->
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find auv_control)/config/controllers.yaml</parameters>
+      <!-- Fin position control is a velocity servo: v = gain * 100 Hz *
+           error. 0.03 (default 0.1) keeps that under the joints' 2 rad/s
+           limit for the largest step (0.8 rad -> 2.4 rad/s, physics clamps
+           the rest) so the servo doesn't slam the fins around. -->
+      <position_proportional_gain>0.03</position_proportional_gain>
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+    </plugin>
+  </gazebo>
+
+  <!-- ============ hydrostatics ============ -->
+  <!-- Force = fluid_density * displaced_volume * g, with g read from the
+       world (no gravity_magnitude here on purpose: SDF's default is 9.8,
+       and a hard-coded 9.81 leaves the hull 0.1% light and drifting up).
+       center_of_buoyancy is a base_link-frame point from the link origin;
+       see buoyancy.hpp. -->
+  <gazebo>
+    <plugin filename="buoyancy" name="auv_current_plugin::Buoyancy">
+      <link_name>base_link</link_name>
+      <fluid_density>${fluid_density}</fluid_density>
+      <hull_volume>${displaced_volume}</hull_volume>
+      <center_of_buoyancy>${vehicle_cog_x} ${vehicle_cog_y} ${vehicle_cog_z + cob_above_cog}</center_of_buoyancy>
+    </plugin>
+  </gazebo>
+
+  <!-- ============ propulsion ============ -->
+  <!-- cmd_vel -> body-frame surge force + yaw torque on the hull. The fin
+       and propeller joints driven through ros2_control are (for now)
+       visual/kinematic: they move the way the real actuators would, but the
+       force that moves the hull comes from this P controller, so Nav2's
+       tuning carries over from the placeholder unchanged. gz-sim's own
+       LiftDrag + Thruster systems are the upgrade path if fin hydrodynamics
+       are ever wanted in the loop.
+       Gain stability bound is 2*I/dt (see thrust_control.hpp): with an
+       11.4 kg vehicle and dt=4 ms that is ~5700 N/(m/s) linear and, with
+       the fins/prop ~0.8-1.1 m from the CoG, ~500 N*m/(rad/s) angular, so
+       40 / 0.5 are far inside it. max_force is lowered from the 52 kg
+       placeholder's 200 N: 60 N on 11.4 kg is already ~5 m/s^2. -->
+  <gazebo>
+    <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
+      <link_name>base_link</link_name>
+      <topic>/cmd_vel</topic>
+      <!-- Every force at the vehicle's composite CoM (see vehicle_cog_*
+           above), not base_link's own: the fins/propeller move the true CoM
+           ~8 cm aft of the lumped link's, and forces applied at the wrong
+           point were pitch/yaw moments that tumbled the hull. -->
+      <center_of_mass>${vehicle_cog_x} ${vehicle_cog_y} ${vehicle_cog_z}</center_of_mass>
+      <linear_gain>40.0</linear_gain>
+      <!-- Yaw loop stiff enough to hold a heading against the current's
+           moments (a real fin set gives N*m of authority at cruise). 0.5
+           let the hull weathervane ~1 rad in 30 s with zero yaw command,
+           so Nav2 oscillated and turned the wrong way. Stability bound is
+           2*I_zz/dt ~ 550 N*m/(rad/s) for I_zz ~ 1.1 kg m^2 at dt = 4 ms. -->
+      <angular_gain>20.0</angular_gain>
+      <max_force>60.0</max_force>
+      <max_torque>40.0</max_torque>
+      <max_linear_speed>${max_linear_speed}</max_linear_speed>
+      <min_turning_radius>${min_turning_radius}</min_turning_radius>
+      <!-- Depth autopilot: holds the spawn depth (and integrates
+           cmd_vel.linear.z). Critically damped for an ~11-50 kg hull:
+           omega = sqrt(20/m), zeta ~ 30 / (2 sqrt(20 m)). Without it the
+           hull drifts a few mm/s in heave from any sub-newton imbalance,
+           since nothing else regulates depth once gravity is real. -->
+      <depth_hold>true</depth_hold>
+      <depth_gain>20.0</depth_gain>
+      <depth_damping>30.0</depth_damping>
+      <max_vertical_force>30.0</max_vertical_force>
+      <max_vertical_speed>0.5</max_vertical_speed>
+      <!-- Treat cmd_vel as zero after this long without a message. -->
+      <cmd_timeout>1.0</cmd_timeout>
+      <!-- Absolute depth setpoints (m below this surface; must match
+           OceanCurrent's surface_z) arrive on /model/<name>/depth_setpoint,
+           bridged from ROS /depth_setpoint (std_msgs/Float64). -->
+      <surface_z>5.0</surface_z>
+    </plugin>
+  </gazebo>
+
+  <!-- ============ environment ============ -->
+  <!-- Ocean current with depth decay + monsoon cycle; same parameters as
+       the placeholder except the drag areas, which now come from the real
+       hull envelope. Manual override topic: /model/<model name>/ocean_current
+       (see auv_gazebo/README.md). -->
+  <gazebo>
+    <plugin filename="ocean_current" name="auv_current_plugin::OceanCurrent">
+      <link_name>base_link</link_name>
+      <center_of_mass>${vehicle_cog_x} ${vehicle_cog_y} ${vehicle_cog_z}</center_of_mass>
+      <speed>0.3</speed>
+      <direction_north_deg>135.0</direction_north_deg>
+      <axial_drag_coefficient>0.3</axial_drag_coefficient>
+      <lateral_drag_coefficient>1.2</lateral_drag_coefficient>
+      <axial_area>${hull_frontal_area}</axial_area>
+      <lateral_area>${hull_lateral_area}</lateral_area>
+      <fluid_density>${fluid_density}</fluid_density>
+      <surface_z>5.0</surface_z>
+      <current_depth_decay_scale>10.0</current_depth_decay_scale>
+      <enable_monsoon_cycle>true</enable_monsoon_cycle>
+      <monsoon_period_sec>120.0</monsoon_period_sec>
+      <sw_monsoon_speed>0.6</sw_monsoon_speed>
+      <sw_monsoon_direction_deg>45.0</sw_monsoon_direction_deg>
+      <ne_monsoon_speed>0.25</ne_monsoon_speed>
+      <ne_monsoon_direction_deg>225.0</ne_monsoon_direction_deg>
+    </plugin>
+  </gazebo>
+
+  <!-- ============ sensors ============ -->
+  <!-- DVL-like odometry: physics-measured pose/twist of the model, on the
+       same topic the EKF already consumes. The real DVL link ("DVL") is
+       kept purely as geometry/TF; gz-sim's OdometryPublisher is per-model,
+       not per-link. -->
+  <gazebo>
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <!-- 3, not 2: the extra Z carries the hull's true depth, which
+           auv_control's sim_depth_sensor turns into a simulated Bar30
+           reading for the depth-hold controller. The EKF is unaffected:
+           auv_localization/config/ekf.yaml selects only vx, vy and yaw
+           rate out of this message and runs in two_d_mode. -->
+      <dimensions>3</dimensions>
+      <odom_publish_frequency>20</odom_publish_frequency>
+      <odom_topic>/dvl_odom</odom_topic>
+    </plugin>
+  </gazebo>
+
+  <!-- IMU on the exported "IMU" link (joint IMU_Link, -0.39 m aft of the
+       origin on the centreline). -->
+  <gazebo>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+  </gazebo>
+  <gazebo reference="IMU">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>true</always_on>
+      <update_rate>50</update_rate>
+      <topic>/imu/data</topic>
+      <gz_frame_id>IMU</gz_frame_id>
+    </sensor>
+  </gazebo>
+
+  <!-- ============ contact tweaks ============ -->
+  <!-- Colours need no help: sdformat's URDF importer turns each visual's
+       <color rgba> into SDF ambient/diffuse, so Gazebo matches RViz. -->
+  <!-- Fixed-joint children (relay, GPS, DVL, dead weights, IMU...) get
+       lumped into base_link by sdformat, which is what we want: one rigid
+       body for physics, fewer collision meshes. The moving links (4 fins +
+       propeller) keep their own mesh collisions; they never touch the hull
+       cylinder in practice, and self-collision is off by default. -->
+  <gazebo>
+    <self_collide>false</self_collide>
+  </gazebo>
+
+</robot>

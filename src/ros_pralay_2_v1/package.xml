@@ -5,7 +5,9 @@
   <version>1.0.0</version>
 
   <description>
-    URDF description package for ROS_PRALAY_2_V1 robot
+    URDF description package for the ROS_PRALAY_2_V1 robot (SolidWorks
+    export), with Gazebo (gz-sim Harmonic) and RViz launch files for the
+    pralay2_nav_sim sandbox.
   </description>
 
   <maintainer email="your@email.com">
@@ -18,10 +20,22 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
 
+  <exec_depend>xacro</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>ros2launch</exec_depend>
+
+  <!-- Gazebo build (sim_mode:=true / gazebo.launch.py). auv_gazebo is
+       deliberately NOT listed even though gazebo.launch.py includes its
+       spawn.launch.py: auv_gazebo depends on this package (spawn.launch.py
+       loads the URDF from here), and listing it back would make a cycle
+       colcon refuses to order. -->
+  <exec_depend>auv_control</exec_depend>
+  <exec_depend>auv_current_plugin</exec_depend>
+  <exec_depend>gz_ros2_control</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
 
 
   <export>

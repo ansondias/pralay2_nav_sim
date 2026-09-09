@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ros_pralay_2_v1">
-      <xacro:arg name="use_ros2_control" default="true"/>
+  <!-- use_ros2_control: true = talk to the real STM32 boards
+       (propulsion_controller / sensors2_controller / imu_controller
+       hardware plugins), false = mock_components. Only consulted when
+       sim_mode is false. -->
+  <xacro:arg name="use_ros2_control" default="true"/>
+  <!-- sim_mode: true = Gazebo (gz-sim Harmonic) + RViz build of this robot.
+       Swaps the ros2_control hardware for gz_ros2_control/GazeboSimSystem,
+       replaces the 20 MB base_link collision mesh with a cylinder, and
+       pulls in ROS_PRALAY_2_V1.gazebo.xacro (buoyancy, thrust, ocean
+       current, IMU, DVL-like odometry plugins). The exported links/joints
+       below are untouched either way, so RViz-only use
+       (display.launch.py) and the real robot (robot.launch.py) see exactly
+       the SolidWorks export. -->
+  <xacro:arg name="sim_mode" default="false"/>
 
-      
+  <!-- Hull envelope, measured from meshes/base_link.STL's bounding box
+       (x: -1.204..1.205, y: +-0.088, z: -0.125..0.270 incl. the top mast).
+       Used for the sim collision cylinder and, in the .gazebo.xacro, for
+       the drag areas. Re-measure if the hull is re-exported. -->
+  <xacro:property name="hull_length" value="2.41"/>
+  <xacro:property name="hull_radius" value="0.088"/>
+
   <link
     name="base_link">
     <inertial>
@@ -19,13 +38,25 @@
         iyz="-1.84761079624565E-07"
         izz="0.254731789225581" />
     </inertial>
+    <!-- Visual: the SolidWorks export is ~400k triangles (20 MB). In
+         sim_mode the Gazebo GUI and RViz (both on software GL inside a
+         ~4 GB container) get meshes/base_link_lowpoly.STL instead: the same
+         hull decimated to 5% (20k triangles, 1 MB, identical bounding box).
+         Regenerate it with trimesh + fast_simplification if the export
+         changes; see the package README. -->
     <visual>
       <origin
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
+        <xacro:unless value="$(arg sim_mode)">
+          <mesh
+            filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
+        </xacro:unless>
+        <xacro:if value="$(arg sim_mode)">
+          <mesh
+            filename="package://ros_pralay_2_v1/meshes/base_link_lowpoly.STL" />
+        </xacro:if>
       </geometry>
       <material
         name="">
@@ -33,15 +64,28 @@
           rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
       </material>
     </visual>
-    <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
-      </geometry>
-    </collision>
+    <!-- The exported collision mesh is ~400k triangles (20 MB); fine for
+         RViz/hardware use, far too heavy for a moving body in gz-sim's
+         physics. In sim_mode a cylinder along x stands in for it. -->
+    <xacro:unless value="$(arg sim_mode)">
+      <collision>
+        <origin
+          xyz="0 0 0"
+          rpy="0 0 0" />
+        <geometry>
+          <mesh
+            filename="package://ros_pralay_2_v1/meshes/base_link.STL" />
+        </geometry>
+      </collision>
+    </xacro:unless>
+    <xacro:if value="$(arg sim_mode)">
+      <collision>
+        <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+        <geometry>
+          <cylinder radius="${hull_radius}" length="${hull_length}"/>
+        </geometry>
+      </collision>
+    </xacro:if>
   </link>
   <link
     name="Relay">
@@ -273,6 +317,10 @@
           rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
       </material>
     </visual>
+    <!-- Sim: no collision mesh on the moving control surfaces / propeller.
+         They never touch anything, the mesh roots sit inside the hull
+         cylinder anyway, and mesh contacts on moving links are pure cost. -->
+    <xacro:unless value="$(arg sim_mode)">
     <collision>
       <origin
         xyz="0 0 0"
@@ -282,6 +330,7 @@
           filename="package://ros_pralay_2_v1/meshes/Fin_Top.STL" />
       </geometry>
     </collision>
+    </xacro:unless>
   </link>
 <link
     name="Fin_Left">
@@ -313,6 +362,10 @@
           rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
       </material>
     </visual>
+    <!-- Sim: no collision mesh on the moving control surfaces / propeller.
+         They never touch anything, the mesh roots sit inside the hull
+         cylinder anyway, and mesh contacts on moving links are pure cost. -->
+    <xacro:unless value="$(arg sim_mode)">
     <collision>
       <origin
         xyz="0 0 0"
@@ -322,6 +375,7 @@
           filename="package://ros_pralay_2_v1/meshes/Fin_Left.STL" />
       </geometry>
     </collision>
+    </xacro:unless>
   </link>
 <link
     name="Fin_Bottom">
@@ -353,6 +407,10 @@
           rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
       </material>
     </visual>
+    <!-- Sim: no collision mesh on the moving control surfaces / propeller.
+         They never touch anything, the mesh roots sit inside the hull
+         cylinder anyway, and mesh contacts on moving links are pure cost. -->
+    <xacro:unless value="$(arg sim_mode)">
     <collision>
       <origin
         xyz="0 0 0"
@@ -362,6 +420,7 @@
           filename="package://ros_pralay_2_v1/meshes/Fin_Bottom.STL" />
       </geometry>
     </collision>
+    </xacro:unless>
   </link>
 <link
     name="Fin_Right">
@@ -393,6 +452,10 @@
           rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
       </material>
     </visual>
+    <!-- Sim: no collision mesh on the moving control surfaces / propeller.
+         They never touch anything, the mesh roots sit inside the hull
+         cylinder anyway, and mesh contacts on moving links are pure cost. -->
+    <xacro:unless value="$(arg sim_mode)">
     <collision>
       <origin
         xyz="0 0 0"
@@ -402,6 +465,7 @@
           filename="package://ros_pralay_2_v1/meshes/Fin_Right.STL" />
       </geometry>
     </collision>
+    </xacro:unless>
   </link>
 <link
     name="T1">
@@ -433,6 +497,10 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
+    <!-- Sim: no collision mesh on the moving control surfaces / propeller.
+         They never touch anything, the mesh roots sit inside the hull
+         cylinder anyway, and mesh contacts on moving links are pure cost. -->
+    <xacro:unless value="$(arg sim_mode)">
     <collision>
       <origin
         xyz="0 0 0"
@@ -442,6 +510,7 @@
           filename="package://ros_pralay_2_v1/meshes/T1.STL" />
       </geometry>
     </collision>
+    </xacro:unless>
   </link>
 <link
     name="Front_DW">
@@ -811,4 +880,7 @@
       xyz="0 0 0" />
   </joint>
   <xacro:include filename="$(find ros_pralay_2_v1)/urdf/ros2_control.urdf.xacro"/>
+  <xacro:if value="$(arg sim_mode)">
+    <xacro:include filename="$(find ros_pralay_2_v1)/urdf/ROS_PRALAY_2_V1.gazebo.xacro"/>
+  </xacro:if>
 </robot>

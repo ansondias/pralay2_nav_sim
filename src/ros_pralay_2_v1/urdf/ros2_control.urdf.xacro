@@ -1,6 +1,13 @@
-         <?xml version="1.0"?>
+<?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:arg name="use_ros2_control" default="true"/>
+    <!-- sim_mode: Gazebo (gz-sim) build. The PralaySystem below is then
+         backed by gz_ros2_control/GazeboSimSystem instead of a serial
+         hardware plugin, and the sensor/IMU systems (real STM32 boards
+         only; they own no joints) are left out entirely. Declared here too
+         so this file still processes standalone; ROS_PRALAY_2_V1.urdf.xacro
+         is what normally sets it. -->
+    <xacro:arg name="sim_mode" default="false"/>
     <!-- Passed in from robot.launch.py, computed there from .env's
          JETSON_FILES_DIR (same source mission_handler.launch.py and
          jetson_tcp_node_d_m.py already use) - one place to change the
@@ -44,6 +51,17 @@
              adapter; superseded now that the master aggregator board (see
              circuit/stm32_frimware/master/master.ino) sits between the Jetson and
              all three slave boards. Kept for standalone bench-testing system_2 alone. -->
+        <!-- Gazebo: gz_ros2_control drives the fin/thruster joints straight
+             from the physics engine, so the same fin_controller /
+             thruster_controller (auv_control/config/controllers.yaml) and
+             the same /fin_controller/commands, /thruster_controller/commands
+             topics work in sim and on the real boat. -->
+        <xacro:if value="$(arg sim_mode)">
+            <hardware>
+                <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+            </hardware>
+        </xacro:if>
+        <xacro:unless value="$(arg sim_mode)">
         <xacro:if value="$(arg use_ros2_control)">
             <hardware>
                 <plugin>propulsion_controller/PropulsionControllerHardware</plugin>
@@ -54,6 +72,7 @@
                 <param name="crash_log_dir">$(arg crash_log_dir)</param>
             </hardware>
         </xacro:if>
+        </xacro:unless>
         <!-- <xacro:if value="$(arg use_ros2_control)">
             <hardware>
                 <plugin>master_controller/MasterControllerHardware</plugin>
@@ -64,10 +83,12 @@
                 <param name="crash_log_dir">$(arg crash_log_dir)</param>
             </hardware>
         </xacro:if> -->
+        <xacro:unless value="$(arg sim_mode)">
         <xacro:unless value="$(arg use_ros2_control)">
             <hardware>
                 <plugin>mock_components/GenericSystem</plugin>
             </hardware>
+        </xacro:unless>
         </xacro:unless>
         <joint name="Fin_Top_Joint">
             <command_interface name="position">
@@ -105,8 +126,18 @@
         </joint>
         <joint name="T1_Joint">
             <command_interface name="velocity">
-                <param name="min">-1.0</param>
-                <param name="max">1.0</param>
+                <!-- Hardware: normalised -1..1 thruster duty. Sim: a real
+                     joint angular velocity in rad/s, so the propeller
+                     visibly spins (auv_control's cmd_vel_to_actuators picks
+                     the scale via its thruster_scale parameter). -->
+                <xacro:if value="$(arg sim_mode)">
+                    <param name="min">-300.0</param>
+                    <param name="max">300.0</param>
+                </xacro:if>
+                <xacro:unless value="$(arg sim_mode)">
+                    <param name="min">-1.0</param>
+                    <param name="max">1.0</param>
+                </xacro:unless>
             </command_interface>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
@@ -120,6 +151,11 @@
          adapter; superseded now that the master aggregator board sits between
          the Jetson and all three slave boards (see PralaySystem above). Kept
          for standalone bench-testing system_3 alone. -->
+    <!-- SensorSystem2 and ImuSystem are serial-board-only: in sim_mode
+         the IMU is a gz-sim sensor and there is no depth/sensor board, so
+         both are skipped (a GazeboSimSystem with no joints has nothing to
+         do and would only log errors). -->
+    <xacro:unless value="$(arg sim_mode)">
     <ros2_control name="SensorSystem2" type="system">
         <xacro:if value="$(arg use_ros2_control)">
             <hardware>
@@ -162,4 +198,5 @@
             </hardware>
         </xacro:unless>
     </ros2_control>
+    </xacro:unless>
 </robot>
