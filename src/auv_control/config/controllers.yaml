@@ -1,3 +1,9 @@
+# Shared by both runtimes:
+#   * hardware: loaded into the ros2_control_node that
+#     launch/controllers.launch.py starts (sim:=false)
+#   * Gazebo:   loaded by gz_ros2_control inside gz-sim, via the <parameters>
+#     tag in ros_pralay_2_v1/urdf/ROS_PRALAY_2_V1.gazebo.xacro (sim:=true)
+# Joint names must match ros_pralay_2_v1/urdf/ros2_control.urdf.xacro.
 controller_manager:
 
   ros__parameters:

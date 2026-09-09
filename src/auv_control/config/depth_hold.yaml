@@ -1,0 +1,45 @@
+depth_hold:
+  ros__parameters:
+    # Target and the acceptable band: 1.0 m, in-band between 0.8 and 1.2 m.
+    target_depth: 1.0
+    tolerance: 0.2
+    enabled: true
+
+    # Blue Robotics Bar30: use its pressure (Pa) and zero it at the surface
+    # on start-up. Set depth_source: "depth" and depth_topic if your driver
+    # already publishes depth in metres.
+    depth_source: "pressure"
+    pressure_topic: "/bar30/pressure"
+    depth_topic: "/bar30/depth"
+    fluid_density: 1025.0        # 997.0 in a fresh-water tank
+    auto_zero: true
+    auto_zero_samples: 20
+    depth_filter_alpha: 0.3
+    sensor_timeout: 1.0
+    surface_on_timeout: true
+
+    # BNO086 (sensor_msgs/Imu) and odometry for speed scaling.
+    imu_topic: "/imu/data"
+    odom_topic: "/odometry/filtered"
+
+    # Outer loop: depth -> desired pitch (nose-down limited to ~20 deg).
+    kp_depth: 0.6
+    ki_depth: 0.05
+    kd_depth: 0.8
+    max_pitch: 0.35
+    integrator_band: 0.5
+
+    # Inner loop: pitch -> elevator, +-40 deg (servo travels +-45 deg).
+    kp_pitch: 2.0
+    kd_pitch: 0.4
+    max_elevator: 0.70
+    elevator_sign: 1.0      # flip to -1.0 if the boat climbs when it should dive
+    pitch_sign: 1.0         # flip to -1.0 if the IMU reports nose-up as positive
+
+    speed_scaling: true
+    reference_speed: 1.0
+    min_speed_for_scaling: 0.3
+    max_scale: 3.0
+
+    control_rate: 20.0
+    sim_mode: false         # true under Gazebo: also drives the plugin depth hold

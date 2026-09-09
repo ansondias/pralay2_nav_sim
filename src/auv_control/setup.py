@@ -20,7 +20,7 @@ setup(
     zip_safe=True,
     maintainer='ros-mad',
     maintainer_email='2021ci62f@sigce.edu.in',
-    description='TODO: Package description',
+    description='ros2_control controllers and cmd_vel mapping for the Pralay-2 fins and propeller (hardware and Gazebo)',
     license='TODO: License declaration',
     extras_require={
         'test': [
@@ -30,6 +30,8 @@ setup(
     entry_points={
         'console_scripts': [
             "fins_control = auv_control.fins_control:main",
+            "cmd_vel_to_actuators = auv_control.cmd_vel_to_actuators:main",
+            "depth_hold = auv_control.depth_hold:main",
         ],
     },
 )

@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""Hardware-only propeller visualiser: integrates cmd_vel into a fake
+T1_Joint position and publishes it on /joint_states so RViz shows the prop
+turning when there is no joint feedback from the boards.
+
+Do NOT run this under Gazebo: there joint_state_broadcaster publishes the
+real joint states (gz_ros2_control) and this node would fight it. The sim
+equivalent is cmd_vel_to_actuators.py, which commands the actual joints.
+"""
 
 import rclpy
 import math
