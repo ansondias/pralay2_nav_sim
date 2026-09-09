@@ -54,7 +54,15 @@ Visualization Manager:
   Tools:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera
-    - Class: nav2_rviz_plugins/GoalTool
+    # rviz_default_plugins/SetGoal, not nav2_rviz_plugins/GoalTool: the Nav2
+    # tool only feeds the Navigation2 panel (which this config does not
+    # load), so clicking it did nothing. This one publishes the clicked pose
+    # as a PoseStamped, and it is pointed at /mission/goal_pose rather than
+    # Nav2's own /goal_pose so auv_bringup's dive_and_navigate can hold the
+    # goal until the hull is at depth, then release it to Nav2.
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /mission/goal_pose
   Views:
     Current:
       Class: rviz_default_plugins/TopDownOrtho

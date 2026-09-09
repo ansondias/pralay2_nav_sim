@@ -5,13 +5,32 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    PythonExpression,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    robot_arg = DeclareLaunchArgument(
+        "robot",
+        default_value="pralay2",
+        choices=["pralay2", "auv"],
+        description='Hull to simulate: "pralay2" (real ROS_PRALAY_2_V1 export, '
+        'with ros2_control fins/propeller) or "auv" (generic placeholder).',
+    )
     headless_arg = DeclareLaunchArgument("headless", default_value="false")
+    # Spawn pose, passed through to auv_gazebo/spawn.launch.py. z is a world
+    # height, not a depth: the free surface is at z = 5 (surface_z in the
+    # hull's gazebo xacro), so z:=4.5 spawns the hull 0.5 m down and a 1 m
+    # depth target is then a genuine descent.
+    x_arg = DeclareLaunchArgument("x", default_value="0.0")
+    y_arg = DeclareLaunchArgument("y", default_value="0.0")
+    z_arg = DeclareLaunchArgument("z", default_value="3.0")
+    yaw_arg = DeclareLaunchArgument("yaw", default_value="0.0")
     rviz_arg = DeclareLaunchArgument("rviz", default_value="true")
     map_arg = DeclareLaunchArgument(
         "map",
@@ -33,7 +52,33 @@ def generate_launch_description():
                 get_package_share_directory("auv_gazebo"), "launch", "spawn.launch.py"
             )
         ),
-        launch_arguments={"headless": LaunchConfiguration("headless")}.items(),
+        launch_arguments={
+            "robot": LaunchConfiguration("robot"),
+            "headless": LaunchConfiguration("headless"),
+            "x": LaunchConfiguration("x"),
+            "y": LaunchConfiguration("y"),
+            "z": LaunchConfiguration("z"),
+            "yaw": LaunchConfiguration("yaw"),
+        }.items(),
+    )
+
+    # 1b. Pralay-2 only: ros2_control spawners (joint_state_broadcaster,
+    #     fin_controller, thruster_controller) into the controller_manager
+    #     that gz_ros2_control runs inside gz-sim, plus the cmd_vel ->
+    #     fin/propeller mapper. Nav2's cmd_vel then both moves the hull
+    #     (ThrustControl) and animates the actuators.
+    controllers = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("auv_control"),
+                "launch",
+                "controllers.launch.py",
+            )
+        ),
+        launch_arguments={"sim": "true", "use_sim_time": "true"}.items(),
+        condition=IfCondition(
+            PythonExpression(["'", LaunchConfiguration("robot"), "' == 'pralay2'"])
+        ),
     )
 
     # 2. Sensor fusion: EKF(imu + dvl-like odom) -> odom->base_link tf,
@@ -112,11 +157,17 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            robot_arg,
             headless_arg,
+            x_arg,
+            y_arg,
+            z_arg,
+            yaw_arg,
             rviz_arg,
             map_arg,
             params_arg,
             spawn,
+            controllers,
             localization,
             map_server,
             map_server_lifecycle,

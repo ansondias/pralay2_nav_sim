@@ -22,12 +22,38 @@ navigation stack, `robot_localization` for sensor fusion.
    cd /workspaces/pralay2_nav_sim
    colcon build --symlink-install
    source install/setup.bash
-   ros2 launch auv_bringup sim.launch.py
+   ros2 launch auv_bringup sim.launch.py            # real Pralay-2 hull (robot:=pralay2)
+   ros2 launch auv_bringup sim.launch.py robot:=auv  # generic placeholder torpedo
    ```
+   Existing containers need a **Rebuild Container** once after this pull:
+   the Pralay-2 hull's fins/propeller run through `gz_ros2_control`, which
+   the Dockerfile now installs.
+
+   **Give Docker enough memory.** The headless stack alone (Gazebo server
+   + EKF + Nav2) uses ~2.3 GB; the Gazebo GUI and RViz on software GL come
+   on top, and the default Docker Desktop VM here is 3.8 GB. If Gazebo
+   stalls or is killed, the spawn node waits forever, the EKF never gets
+   odometry, and Nav2 loops on `Could not find a connection between
+   'odom' and 'base_link'`. Set Docker Desktop > Settings > Resources >
+   Memory to 8 GB (the devcontainer declares this in `hostRequirements`),
+   or run `headless:=true rviz:=false` when you only need the planner.
+   See `src/ros_pralay_2_v1/README.md` ("Troubleshooting").
+
+   **If nodes freeze at start-up** (controller_server, the ros_gz bridge,
+   the spawn node or RViz print nothing, controller spawners report
+   "Failed to acquire lock", Ctrl-C needs SIGKILL): stale Fast DDS
+   shared-memory files from earlier killed processes. Clear them with no
+   ROS processes running:
+   ```bash
+   rm -f /dev/shm/fastrtps_*
+   ```
+   Sourcing `install/setup.bash` (after a build) also switches Fast DDS to
+   UDP only via `auv_bringup/config/fastdds_no_shm.xml`, which avoids the
+   problem entirely.
 4. **Viewing the GUI**: the container runs a bundled virtual desktop
    (noVNC), not host X11 forwarding -- this is what makes "Reopen in
-   Container" work the same way on Linux and macOS. Once the container is
-   running, open **http://localhost:6080** in a browser (VS Code will also
+   Container" work http://localhost:6080 he same way on Linux and macOS. Once the container is
+   running, open **** in a browser (VS Code will also
    pop a "port forwarded" notification for 6080) to see the Gazebo and
    RViz windows. Rendering is software-only (`LIBGL_ALWAYS_SOFTWARE=1`),
    so it's not fast, but it's portable and needs no host GPU passthrough.
@@ -59,7 +85,9 @@ current live over a Gazebo topic instead of editing the world file).
 |---|---|
 | `auv_planning` | **Main deliverable.** `nav2_core::GlobalPlanner` plugin(s) for the `GridBased` slot -- iterate on your planning algorithm here. |
 | `auv_current_plugin` | Gazebo (gz-sim) system plugins: `OceanCurrent` (configurable horizontal current drag force) and `ThrustControl` (cmd_vel -> body-frame thrust force/torque, since a floating AUV has no ground contact for a wheeled-robot plugin to push against). |
-| `auv_description` | Generic placeholder AUV URDF/xacro (torpedo hull, IMU, DVL-like odometry via gz-sim's `OdometryPublisher`). |
+| `ros_pralay_2_v1` | **Real Pralay-2 hull**: SolidWorks URDF export (fins, propeller, sensor links, meshes) + `sim_mode` xacro switch that adds the Gazebo plugins and `gz_ros2_control`. RViz-only and hardware launches too. |
+| `auv_control` | ros2_control controllers for the Pralay-2 fins/propeller (same YAML on hardware and in Gazebo) and `cmd_vel_to_actuators`, which turns `/cmd_vel` into fin angles + propeller speed. |
+| `auv_description` | Generic placeholder AUV URDF/xacro (torpedo hull, IMU, DVL-like odometry via gz-sim's `OdometryPublisher`). Kept as `robot:=auv`. |
 | `auv_gazebo` | The `ocean_arena` world, spawn launch, ros_gz bridge config. |
 | `auv_localization` | `robot_localization` EKF (IMU + simulated DVL odom) -> `/odometry/filtered`. |
 | `auv_navigation` | Nav2 params (stock defaults except the `GridBased` planner plugin) + a wrapper around `nav2_bringup`'s `navigation_launch.py`. |

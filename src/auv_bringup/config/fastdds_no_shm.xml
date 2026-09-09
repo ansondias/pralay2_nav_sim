@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Fast DDS profile that uses UDP only and disables the shared-memory
+  transport. In the devcontainer, processes that get SIGKILLed (a hung
+  Ctrl-C, an OOM kill, a stale sim) leave fastrtps_* segments and port-lock
+  files in /dev/shm; with hundreds of them the SHM transport stalls new
+  participants during discovery and nodes freeze before their first log
+  line (controller_server, the ros_gz bridge, the spawn node, RViz never
+  start; controller spawners "Failed to acquire lock"). Selected through
+  FASTRTPS_DEFAULT_PROFILES_FILE by auv_bringup's environment hook, so it
+  applies whenever the workspace is sourced.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_only</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="udp_only_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>udp_only</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

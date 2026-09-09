@@ -10,6 +10,9 @@
       "vncPort": "5901"
     }
   },
+  "hostRequirements": {
+    "memory": "8gb"
+  },
   "forwardPorts": [6080, 5901],
   "portsAttributes": {
     "6080": {

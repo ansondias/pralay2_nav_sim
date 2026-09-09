@@ -1,0 +1,1 @@
+set;FASTRTPS_DEFAULT_PROFILES_FILE;@CMAKE_INSTALL_PREFIX@/share/auv_bringup/config/fastdds_no_shm.xml
