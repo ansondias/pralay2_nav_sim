@@ -32,6 +32,8 @@ setup(
             "fins_control = auv_control.fins_control:main",
             "cmd_vel_to_actuators = auv_control.cmd_vel_to_actuators:main",
             "depth_hold = auv_control.depth_hold:main",
+            "simple_depth_fin = auv_control.simple_depth_fin:main",
+            "simple_roll_fin = auv_control.simple_roll_fin:main",
         ],
     },
 )
