@@ -21,7 +21,24 @@ Parameters
                                                     the servo stop)
 
 Wiring (same as depth_hold.py, so cmd_vel_to_actuators needs no change)
-    sub  depth_topic     std_msgs/Float64  depth in m, +ve down  (/bar30/depth)
+    sub  pressure_topic  sensor_msgs/FluidPressure  Pa  (/depth/pressure)
+                                            converted to depth in m with
+                                            (p - surface_pressure) / (rho * g).
+                                            NOTE FluidPressure is in PASCALS:
+                                            surface_pressure_pa is 101325, not
+                                            1013.25 (that is hPa) -- a factor of
+                                            100 there reads ~10 m of depth while
+                                            floating on the surface.
+                                            With auto_zero (default) the first
+                                            auto_zero_samples readings are
+                                            averaged and used as the surface
+                                            pressure instead, which also cancels
+                                            weather and per-sensor offset. The
+                                            AUV must be at the surface at start-up.
+    sub  depth_topic     std_msgs/Float64  depth in m, already converted
+                                            (/bar30/depth); used instead of the
+                                            pressure topic when depth_source
+                                            is "depth"
     pub  elevator_topic  std_msgs/Float64  elevator angle in rad; +ve = nose UP
                                             (/depth_hold/elevator)
     pub  /depth_hold/in_band  std_msgs/Bool  True while |error| <= depth_threshold.
@@ -42,6 +59,7 @@ import math
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from sensor_msgs.msg import FluidPressure
 from std_msgs.msg import Bool, Float64
 
 
@@ -75,20 +93,38 @@ class SimpleDepthFin(Node):
         self.declare_parameter("target_depth", 2.0)      # m
         self.declare_parameter("depth_threshold", 0.3)   # m
         self.declare_parameter("max_fin_angle", math.radians(45.0))  # rad, 45 deg servo stop
+        self.declare_parameter("depth_source", "pressure")  # "pressure" | "depth"
+        self.declare_parameter("pressure_topic", "/depth/pressure")
         self.declare_parameter("depth_topic", "/bar30/depth")
         self.declare_parameter("elevator_topic", "/depth_hold/elevator")
         self.declare_parameter("control_rate", 20.0)     # Hz
         self.declare_parameter("elevator_sign", 1.0)     # flip if it climbs when it should dive
+        # Pressure -> depth. PASCALS: 101325 Pa == 1013.25 hPa.
+        self.declare_parameter("fluid_density", 1025.0)   # kg/m^3 (997 fresh water)
+        self.declare_parameter("gravity", 9.80665)
+        self.declare_parameter("surface_pressure_pa", 101325.0)
+        self.declare_parameter("auto_zero", True)         # average the first samples instead
+        self.declare_parameter("auto_zero_samples", 20)
 
         p = self.get_parameter
         self.target = float(p("target_depth").value)
         self.threshold = float(p("depth_threshold").value)
         self.max_fin = float(p("max_fin_angle").value)
         self.elevator_sign = float(p("elevator_sign").value)
+        self.rho = float(p("fluid_density").value)
+        self.g = float(p("gravity").value)
+        self.surface_pressure = float(p("surface_pressure_pa").value)
+        self.auto_zero = bool(p("auto_zero").value)
+        self.auto_zero_samples = int(p("auto_zero_samples").value)
+        self.zero_samples = []
 
         self.depth = None
 
-        self.create_subscription(Float64, p("depth_topic").value, self.on_depth, 10)
+        if str(p("depth_source").value) == "pressure":
+            self.create_subscription(
+                FluidPressure, p("pressure_topic").value, self.on_pressure, 10)
+        else:
+            self.create_subscription(Float64, p("depth_topic").value, self.on_depth, 10)
         self.create_subscription(Float64, "/depth_hold/target_depth", self.on_target, 10)
         self.elevator_pub = self.create_publisher(Float64, p("elevator_topic").value, 10)
         self.in_band_pub = self.create_publisher(Bool, "/depth_hold/in_band", 10)
@@ -98,6 +134,19 @@ class SimpleDepthFin(Node):
             f"simple depth fin: target {self.target:.2f} m, band +-{self.threshold:.2f} m, "
             f"max fin {math.degrees(self.max_fin):.0f} deg"
         )
+
+    def on_pressure(self, msg: FluidPressure):
+        """Convert the Bar30's absolute pressure (Pa) to depth below the surface."""
+        pressure = msg.fluid_pressure
+        if self.auto_zero and len(self.zero_samples) < self.auto_zero_samples:
+            # Still at the surface: collect the atmospheric baseline first.
+            self.zero_samples.append(pressure)
+            if len(self.zero_samples) == self.auto_zero_samples:
+                self.surface_pressure = sum(self.zero_samples) / len(self.zero_samples)
+                self.get_logger().info(
+                    f"surface pressure zeroed at {self.surface_pressure:.0f} Pa")
+            return
+        self.depth = (pressure - self.surface_pressure) / (self.rho * self.g)
 
     def on_depth(self, msg: Float64):
         self.depth = msg.data

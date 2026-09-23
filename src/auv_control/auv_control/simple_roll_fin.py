@@ -32,14 +32,16 @@ Parameters (angles in deg, rates in deg/s; converted to rad internally)
     axis             "roll" | "pitch"                      (default roll)
 
 Wiring
-    sub  imu_topic   sensor_msgs/Imu    orientation quaternion (/imu/data)
+    sub  imu_topic   sensor_msgs/Imu    orientation quaternion (/imu)
     pub  fin_topic   std_msgs/Float64   differential (aileron) fin angle, rad
                                         (/roll_hold/aileron)
 
 The output is the *differential* command for a fin pair (one fin +, the
-other -). cmd_vel_to_actuators does not consume /roll_hold/aileron yet: the
-mixer needs `top = rudder + aileron`, `bottom = rudder - aileron` added
-before this node moves anything. Fins only act with forward speed.
+other -). cmd_vel_to_actuators mixes it into the horizontal pair as
+`Fin_Left = elevator + aileron`, `Fin_Right = elevator - aileron`, so depth
+gets the pair's average and roll its difference. How much of the fin stop
+each may use depends on whether depth is holding: see share_elevator_pair
+there. Fins only act with forward speed.
 
     ros2 run auv_control simple_roll_fin --ros-args -p full_fin_at:=30.0
 """
@@ -91,7 +93,7 @@ class SimpleRollFin(Node):
         self.declare_parameter("max_fin_angle", 10.0)    # deg, roll budget
         self.declare_parameter("max_fin_rate", 30.0)     # deg/s slew limit
         self.declare_parameter("axis", "roll")           # "roll" | "pitch"
-        self.declare_parameter("imu_topic", "/imu/data")
+        self.declare_parameter("imu_topic", "/imu")
         self.declare_parameter("fin_topic", "/roll_hold/aileron")
         self.declare_parameter("control_rate", 20.0)     # Hz
         self.declare_parameter("fin_sign", 1.0)          # flip if it rolls the wrong way

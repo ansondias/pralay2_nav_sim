@@ -34,10 +34,8 @@ joint_state_broadcaster:
 fin_controller:
   ros__parameters:
     joints:
-      - Fin_Top_Joint
       - Fin_Left_Joint
       - Fin_Right_Joint
-      - Fin_Bottom_Joint
 
     interface_name: position
 
