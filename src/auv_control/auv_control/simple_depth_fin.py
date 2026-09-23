@@ -1,58 +1,5 @@
 #!/usr/bin/env python3
-"""Basic two-regime depth-to-fin controller for the Pralay-2.
-
-A deliberately simple alternative to depth_hold.py (no PID, no IMU, no
-speed scaling) that drives the elevator fins straight from the depth error:
-
-    error = target_depth - depth        (m, +ve: AUV is too shallow)
-
-    |error| >  depth_threshold  ->  full fin deflection toward the target
-                                    (bang-bang: max_fin_angle, nose down if
-                                    too shallow, nose up if too deep)
-    |error| <= depth_threshold  ->  fin angle proportional to the error,
-                                    Arduino-style map() from
-                                    [-threshold, +threshold] onto
-                                    [-max_fin_angle, +max_fin_angle]
-
-Parameters
-    target_depth     m below the surface           (default 2.0)
-    depth_threshold  m, half-width of the band      (default 0.3)
-    max_fin_angle    rad, full fin movement         (default pi/4 = 45 deg,
-                                                    the servo stop)
-
-Wiring (same as depth_hold.py, so cmd_vel_to_actuators needs no change)
-    sub  pressure_topic  sensor_msgs/FluidPressure  Pa  (/depth/pressure)
-                                            converted to depth in m with
-                                            (p - surface_pressure) / (rho * g).
-                                            NOTE FluidPressure is in PASCALS:
-                                            surface_pressure_pa is 101325, not
-                                            1013.25 (that is hPa) -- a factor of
-                                            100 there reads ~10 m of depth while
-                                            floating on the surface.
-                                            With auto_zero (default) the first
-                                            auto_zero_samples readings are
-                                            averaged and used as the surface
-                                            pressure instead, which also cancels
-                                            weather and per-sensor offset. The
-                                            AUV must be at the surface at start-up.
-    sub  depth_topic     std_msgs/Float64  depth in m, already converted
-                                            (/bar30/depth); used instead of the
-                                            pressure topic when depth_source
-                                            is "depth"
-    pub  elevator_topic  std_msgs/Float64  elevator angle in rad; +ve = nose UP
-                                            (/depth_hold/elevator)
-    pub  /depth_hold/in_band  std_msgs/Bool  True while |error| <= depth_threshold.
-                                            cmd_vel_to_actuators uses this to
-                                            decide whether the elevator/aileron
-                                            fin budget applies (only in band;
-                                            outside it depth gets the whole fin).
-
-Run only ONE of depth_hold / simple_depth_fin at a time: both publish the
-same elevator topic. Fins only act with water flowing over them, so the
-AUV must have forward speed for this to do anything.
-
-    ros2 run auv_control simple_depth_fin --ros-args -p target_depth:=2.0
-"""
+"""Hold a target depth by driving the elevator fins."""
 
 import math
 
@@ -136,7 +83,6 @@ class SimpleDepthFin(Node):
         )
 
     def on_pressure(self, msg: FluidPressure):
-        """Convert the Bar30's absolute pressure (Pa) to depth below the surface."""
         pressure = msg.fluid_pressure
         if self.auto_zero and len(self.zero_samples) < self.auto_zero_samples:
             # Still at the surface: collect the atmospheric baseline first.

@@ -1,60 +1,5 @@
 #!/usr/bin/env python3
-"""Mix the depth and roll commands onto the Pralay-2's horizontal fin pair.
-
-Depth and roll are both carried by Fin_Left / Fin_Right, so this node takes
-the two controllers' outputs and combines them:
-
-    Fin_Left  = elevator + aileron
-    Fin_Right = elevator - aileron
-
-The pair's *average* is exactly the elevator (depth) and its *difference* is
-exactly 2*aileron (roll), and those two modes do not affect each other's
-axis -- so the depth and roll controllers can run as completely independent
-nodes that never talk to each other. Only this node needs the whole picture,
-and all it does is an add and a subtract.
-
-Inputs
-    /depth_hold/elevator   std_msgs/Float64  elevator angle, rad, +ve nose up
-                                             (simple_depth_fin / depth_hold)
-    /roll_hold/aileron     std_msgs/Float64  differential angle, rad
-                                             (simple_roll_fin)
-    /depth_hold/in_band    std_msgs/Bool     True while depth is holding
-
-Output
-    /fin_controller/commands   Float64MultiArray, 2 values in controller order
-                               [Fin_Left, Fin_Right]
-
-fin_controller is declared over exactly those two joints in
-auv_control/config/controllers.yaml, so the array length must stay 2. The
-hull therefore has no fin steering, and nothing here drives the propeller:
-the horizontal fins only generate lift with water flowing over them, so
-something else must provide forward speed or these commands do nothing.
-
-The one place depth and roll can collide is the fin stop, and how it is
-shared depends on whether depth is currently *holding* or *moving*, via
-/depth_hold/in_band:
-
-  * in band (|depth error| <= threshold, holding): fixed budget --
-    elevator <= elevator_hold_limit (35 deg), aileron <= aileron_hold_limit
-    (10 deg). 35 + 10 = 45, so neither fin can ever be clipped and a roll
-    correction can never leak into pitch.
-  * out of band (diving / climbing): depth is not limited -- the elevator
-    may use the whole elevator_full_limit (45 deg) -- and roll only gets the
-    headroom left over, shrinking to zero at full elevator. Depth is the
-    mission-critical axis; getting to depth beats being level on the way.
-
-Either input going stale is treated as that controller being absent: after
-input_timeout seconds the elevator or aileron falls back to zero rather
-than holding its last value, so a dead node leaves the fins neutral instead
-of stuck at a deflection.
-
-Sign conventions (all overridable by parameter):
-  * elevator_sign = +1: a +y rotation of the left fin lifts its trailing
-    edge, pitching the nose up.
-  * The URDF axes of the *paired* fins are mirrored (Left +y / Right -y),
-    so the second fin of each pair gets the opposite joint value to deflect
-    the same physical way: fin_pair_signs handles it.
-"""
+"""Mix the depth and roll commands onto the horizontal fin pair."""
 
 import math
 
@@ -84,8 +29,7 @@ class CmdVelToActuators(Node):
         self.declare_parameter("elevator_topic", "/depth_hold/elevator")
         self.declare_parameter("aileron_topic", "/roll_hold/aileron")
         self.declare_parameter("in_band_topic", "/depth_hold/in_band")
-        # Fin-stop budget; the hold limits sum to 45 deg so nothing clips
-        # while holding depth. See the module docstring.
+        # Hold limits sum to 45 deg so no fin clips while holding depth.
         self.declare_parameter("elevator_hold_limit", math.radians(35.0))
         self.declare_parameter("aileron_hold_limit", math.radians(10.0))
         self.declare_parameter("elevator_full_limit", math.radians(45.0))

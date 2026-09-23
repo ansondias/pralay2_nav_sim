@@ -34,6 +34,10 @@ setup(
             "depth_hold = auv_control.depth_hold:main",
             "simple_depth_fin = auv_control.simple_depth_fin:main",
             "simple_roll_fin = auv_control.simple_roll_fin:main",
+            "basic_depth_hold = auv_control.basic_depth_hold:main",
+            "basic_roll_hold = auv_control.basic_roll_hold:main",
+            "basic_fin_mixer = auv_control.basic_fin_mixer:main",
+            "basic_depth_roll_control = auv_control.basic_depth_roll_control:main",
         ],
     },
 )
