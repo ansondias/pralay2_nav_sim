@@ -29,10 +29,10 @@
 //                  [target - tolerance, target + tolerance] (default
 //                  1.0 m +- 0.2 m, i.e. 0.8 .. 1.2 m).
 //   3. SURFACING : if `surface_on_timeout` and the depth sensor goes silent,
-//                  fins go to full nose-up so a real boat comes up.
+//                  fins go to full nose-up so the real AUV comes up.
 //
 // Control law (every sign is also a parameter, so it can be flipped on the
-// boat without touching code):
+// AUV without touching code):
 //   depth_error   = target_depth - depth               (m, +ve: too shallow)
 //   desired_pitch = clamp(Kp_d*e + Ki_d*int(e) - Kd_d*depth_rate, +-max_pitch)
 //                   (+ve = nose DOWN in the ROS FLU body frame)
@@ -107,13 +107,17 @@ public:
     rho_ = declare_parameter("fluid_density", 1025.0);       // kg/m^3 (997 fresh water)
     g_ = declare_parameter("gravity", 9.80665);
     // Surface (atmospheric) pressure. auto_zero averages the first
-    // `auto_zero_samples` readings on start-up (the boat must be at the
+    // `auto_zero_samples` readings on start-up (the AUV must be at the
     // surface then); otherwise surface_pressure_pa is used as-is.
     surface_pressure_ = declare_parameter("surface_pressure_pa", 101325.0);
     auto_zero_ = declare_parameter("auto_zero", true);
     auto_zero_samples_ = declare_parameter("auto_zero_samples", 20);
     alpha_ = declare_parameter("depth_filter_alpha", 0.3);   // low-pass on depth, 0..1
     sensor_timeout_ = declare_parameter("sensor_timeout", 1.0);  // s -> failsafe
+    // IMU freshness. Without this a frozen IMU was trusted forever: the
+    // inner loop kept closing on a stale pitch instead of falling back to
+    // the depth-only path below.
+    imu_timeout_ = declare_parameter("imu_timeout", 1.0);
     surface_on_timeout_ = declare_parameter("surface_on_timeout", true);
 
     // ---- outer loop: depth -> desired pitch -----------------------------------
@@ -158,6 +162,11 @@ public:
       "/depth_hold/target_depth", 10, std::bind(&DepthHold::onTarget, this, std::placeholders::_1));
     enable_sub_ = create_subscription<std_msgs::msg::Bool>(
       "/depth_hold/enable", 10, std::bind(&DepthHold::onEnable, this, std::placeholders::_1));
+    // Zero the depth integrator on demand: the mission sequencer sends this
+    // after a payload release (trim changed) and on a per-mission reset.
+    reset_sub_ = create_subscription<std_msgs::msg::Bool>(
+      "/depth_hold/reset_integrator", 10,
+      [this](const std_msgs::msg::Bool::SharedPtr m) {if (m->data) {integral_ = 0.0;}});
 
     elevator_pub_ = create_publisher<std_msgs::msg::Float64>("/depth_hold/elevator", 10);
     depth_pub_ = create_publisher<std_msgs::msg::Float64>("/depth_hold/depth", 10);
@@ -230,7 +239,7 @@ private:
   {
     pitch_ = pitch_sign_ * quaternionToPitch(msg->orientation);
     pitch_rate_ = pitch_sign_ * msg->angular_velocity.y;
-    have_imu_ = true;
+    last_imu_time_ = this->now();
   }
 
   void onOdom(const nav_msgs::msg::Odometry::SharedPtr msg) {speed_ = msg->twist.twist.linear.x;}
@@ -284,6 +293,7 @@ private:
       } else if (n == "max_scale") {max_scale_ = p.as_double();
       } else if (n == "surface_on_timeout") {surface_on_timeout_ = p.as_bool();
       } else if (n == "sensor_timeout") {sensor_timeout_ = p.as_double();
+      } else if (n == "imu_timeout") {imu_timeout_ = p.as_double();
       } else if (n == "fluid_density") {rho_ = p.as_double();
       } else if (n == "depth_filter_alpha") {alpha_ = p.as_double();
       }
@@ -336,8 +346,14 @@ private:
 
     // Inner loop: pitch error -> elevator. Positive elevator = nose UP, so a
     // nose-down demand needs a negative elevator: hence the leading minus.
+    // IMU counts only while fresh; a stale one falls through to depth-only.
+    const bool have_imu = last_imu_time_ &&
+      (this->now() - *last_imu_time_).seconds() < imu_timeout_;
+    if (!have_imu && last_imu_time_) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "IMU stale, driving elevator from depth loop only");
+    }
     double elevator;
-    if (have_imu_) {
+    if (have_imu) {
       const double pitch_error = desired_pitch - pitch_;
       elevator = -(kp_p_ * pitch_error - kd_p_ * pitch_rate_);
     } else {
@@ -395,7 +411,8 @@ private:
   std::vector<double> zero_samples_;
   double pitch_{0.0};                        // rad (+ nose down)
   double pitch_rate_{0.0};                   // rad/s
-  bool have_imu_{false};
+  std::optional<rclcpp::Time> last_imu_time_;
+  double imu_timeout_{1.0};
   std::optional<double> speed_;              // m/s surge
   double integral_{0.0};
   std::string state_;
@@ -408,6 +425,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_sub_;
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr enable_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr reset_sub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr elevator_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr depth_pub_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_pub_;

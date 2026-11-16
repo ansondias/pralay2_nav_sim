@@ -33,7 +33,7 @@ depth_hold:
     kp_pitch: 2.0
     kd_pitch: 0.4
     max_elevator: 0.70
-    elevator_sign: 1.0      # flip to -1.0 if the boat climbs when it should dive
+    elevator_sign: 1.0      # flip to -1.0 if the AUV climbs when it should dive
     pitch_sign: 1.0         # flip to -1.0 if the IMU reports nose-up as positive
 
     speed_scaling: true

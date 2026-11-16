@@ -61,6 +61,38 @@ navigation stack, `robot_localization` for sensor fusion.
    goal and watch `auv_planning::AStarPlanner` plan a path across the
    `ocean_arena` map.
 
+## Mission sequencer (dive, transit, and optionally deliver)
+
+`ros2 launch auv_bringup mission.launch.py` runs the whole system through a
+twelve-phase sequencer, `auv_bringup/src/dive_and_navigate.cpp`. Goals come
+from RViz's "2D Goal Pose" tool on `/mission/goal_pose`; watch progress on
+`/mission/phase` and the result on `/mission/outcome`.
+
+| # | Phase | Leaves when |
+|---|---|---|
+| 1 | DEPLOY | depth hold disabled, no thrust; the depth controller is seen |
+| 2 | SENSOR_CHECK | depth (after the Bar30 surface zero), IMU and odometry all fresh; otherwise stays inert |
+| 3 | PLAN | a goal arrives (until then the hull holds station: shuttles ±1 m about where the wait began with its bow settling into the current, and is steered back if the current still carries it `station_radius` off), Nav2 returns a drivable path and `V - C` clears `min_speed_margin_vs_current` on every leg; energy check runs only if a battery reading exists on `/battery/energy_wh` |
+| 4 | ARM | depth hold enabled, holding the current depth (`require_arm_command` waits for `/mission/arm`) |
+| 5 | CRUISE | measured speed reaches `min_speed_for_fins`, steering along the first leg |
+| 6 | DIVE | depth enters the band |
+| 7 | SETTLE | in band for `settle_time` |
+| 8 | TRANSIT | Nav2 reaches the goal; depth hold owns the elevator throughout |
+| 9-11 | DELIVERY_DEPTH, TERMINAL, DELIVER | only with `enable_delivery:=true`: re-target `delivery_depth`, close to `contact_range` at `terminal_speed`, publish `/payload/release`, wait for `/payload/released`, reset the depth integrator |
+| 12 | END_STATE | outcome published, hull holds station as in PLAN (not after `on_abort: park`); a new goal continues from PLAN, a new `/mission/id` resets to DEPLOY |
+
+Monitors run every cycle from phase 5: sensor freshness, `max_mission_depth`,
+`abort_pitch`, energy against the remaining route, and live `V - C` toward
+the goal. A trip aborts. The vehicle is one-way, so abort never retreats and
+never releases: `on_abort:=hold` keeps depth, `on_abort:=park` switches
+everything off.
+
+Two things the simulator hides. Phase 5 exists because a fin-steered hull
+cannot dive without forward speed; Gazebo's thrust plugin moves the hull
+vertically on its own, so the dive would work in sim without it and fail on
+the AUV. And the energy checks are skipped until something publishes
+`/battery/energy_wh`; the sim has no battery.
+
 ## Testing planning against a current
 
 The current a scenario uses lives in two places that are **not** wired

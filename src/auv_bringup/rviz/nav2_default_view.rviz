@@ -31,17 +31,39 @@ Visualization Manager:
       Topic:
         Value: /local_costmap/costmap
       Enabled: false
+    # Nav2's own plans are 2-D and drawn at z = 0, the surface. Kept for
+    # reference but off by default; the *AtDepth copies below (from
+    # auv_bringup's plan_at_depth) are the same paths at the held depth,
+    # where the hull actually flies them.
     - Class: rviz_default_plugins/Path
-      Name: GlobalPlan
+      Name: GlobalPlan (surface)
       Topic:
         Value: /plan
       Color: 255; 128; 0
-      Enabled: true
+      Alpha: 0.4
+      Enabled: false
     - Class: rviz_default_plugins/Path
-      Name: LocalPlan
+      Name: LocalPlan (surface)
       Topic:
         Value: /local_plan
       Color: 0; 255; 0
+      Alpha: 0.4
+      Enabled: false
+    - Class: rviz_default_plugins/Path
+      Name: GlobalPlanAtDepth
+      Topic:
+        Value: /plan_at_depth
+      Color: 255; 128; 0
+      Line Style: Billboards
+      Line Width: 0.15
+      Enabled: true
+    - Class: rviz_default_plugins/Path
+      Name: LocalPlanAtDepth
+      Topic:
+        Value: /local_plan_at_depth
+      Color: 0; 255; 0
+      Line Style: Billboards
+      Line Width: 0.1
       Enabled: true
     - Class: rviz_default_plugins/Odometry
       Name: FilteredOdometry
@@ -64,9 +86,13 @@ Visualization Manager:
       Topic:
         Value: /mission/goal_pose
   Views:
+    # Orbit, not TopDownOrtho: a top-down view hides z, which is the point
+    # of the 3-D EKF + at-depth paths. The grid is the surface (map z = 0).
     Current:
-      Class: rviz_default_plugins/TopDownOrtho
-      Scale: 15
+      Class: rviz_default_plugins/Orbit
+      Distance: 30
+      Pitch: 0.45
+      Yaw: 3.9
       Target Frame: base_link
 Window Geometry:
   Height: 1000

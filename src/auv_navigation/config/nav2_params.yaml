@@ -48,13 +48,13 @@ controller_server:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       # Loosened from 0.3/0.3: the AUV is Ackermann-steered (min_turning_radius
-      # 4.16m, can't rotate in place -- see FollowPath below) and 2.4m long,
+      # 5.0 m, can't rotate in place -- see FollowPath below) and 2.4m long,
       # so it can't reliably hit a tight final position/heading the way a
       # holonomic or in-place-rotating robot could. yaw_goal_tolerance of
       # ~pi means heading at the goal is effectively unconstrained, since
       # there's no way to guarantee a specific final heading without
       # in-place rotation anyway.
-      # 2.0 m, not 1.0: with a 4.16 m minimum turning radius a missed 1 m
+      # 2.0 m, not 1.0: with a 5.0 m minimum turning radius a missed 1 m
       # circle can't be re-entered without a full loop -- the controller
       # then circles the goal ("rotating on a point" from the outside).
       xy_goal_tolerance: 2.0
@@ -70,7 +70,7 @@ controller_server:
     # auv_current_plugin::ThrustControl (auv.gazebo.xacro) and the
     # commit -- both derive from the same hull_length=2.4m in
     # auv_description/urdf/auv.urdf.xacro and a ~30 deg max fin deflection:
-    # min_turning_radius = hull_length / tan(30 deg) ~= 4.16 m.
+    # min_turning_radius = hull_length / tan(30 deg) ~= 4.16 m, rounded up to 5.0 m.
     #
     # Top speed: 4 kn = 4 * 0.514444 m/s ~= 2.06 m/s.
     FollowPath:
@@ -101,7 +101,7 @@ controller_server:
       use_rotate_to_heading: false
       max_angular_accel: 2.0
       max_robot_pose_search_dist: 10.0
-      min_turning_radius: 4.16
+      min_turning_radius: 5.0
       use_fixed_curvature_lookahead: false
       transform_tolerance: 0.2
       xy_goal_tolerance: 2.0
@@ -119,7 +119,7 @@ local_costmap:
       width: 10
       height: 10
       resolution: 0.2
-      # The hull is 2.41 m long: model it as its circumscribed circle
+      # The hull is 2.4 m long: model it as its circumscribed circle
       # (half-length 1.2 m) rather than the old 0.3 m point, and inflate
       # well beyond it. With cost_scaling 1.5 the planner's "blocked"
       # threshold (cost >= 99) sits ~1.8 m from an obstacle edge, so the bow
@@ -195,7 +195,7 @@ planner_server:
       # auv_current_plugin::ThrustControl. Without this the search emitted
       # grid corners far tighter than the hull can turn, the controller
       # swung wide of them, and the vehicle hit obstacles.
-      minimum_turning_radius: 4.16
+      minimum_turning_radius: 5.0
       primitive_length: 1.0
       heading_bins: 36
       goal_tolerance: 1.0
@@ -254,13 +254,13 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    # x: 4 kn top speed (2.06 m/s); theta: v/min_turning_radius = 2.06/4.16,
+    # x: 4 kn top speed (2.06 m/s); theta: v/min_turning_radius = 2.06/5.0 ~= 0.41,
     # the max yaw rate achievable at top speed given FollowPath's
     # min_turning_radius (see controller_server.FollowPath above). Reverse
     # x is a conservative straight-line-only allowance for the "backup"
     # recovery behavior -- Ackermann reverse steering isn't modeled.
-    max_velocity: [2.06, 0.0, 0.5]
-    min_velocity: [-0.5, 0.0, -0.5]
+    max_velocity: [2.06, 0.0, 0.41]
+    min_velocity: [-0.5, 0.0, -0.41]
     max_accel: [1.0, 0.0, 2.0]
     max_decel: [-1.0, 0.0, -2.0]
     odom_topic: "/odometry/filtered"

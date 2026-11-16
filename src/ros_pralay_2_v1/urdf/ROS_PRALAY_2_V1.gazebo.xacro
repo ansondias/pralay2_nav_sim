@@ -16,26 +16,34 @@
   <!-- Nominal seawater; must match OceanCurrent/Buoyancy below. -->
   <xacro:property name="fluid_density" value="1025.0"/>
   <!-- Total vehicle mass = the sum of every <mass> in
-       ROS_PRALAY_2_V1.urdf.xacro (base_link 9.797 + 4 fins x 0.261 + 3 dead
+       ROS_PRALAY_2_V1.urdf.xacro (base_link 38.416 + 4 fins x 0.261 + 3 dead
        weights x 0.093 + relay/GPS/nav light/DVL/depth/IMU/T1 small parts).
-       Buoyancy acts on base_link only but has to carry the whole model, so
-       it is sized from the total, not base_link's own mass. Keep all the
-       digits: rounding to 11.381 left the hull 0.005 N heavy, which with
-       nothing else acting in heave is a steady ~3 mm/s sink. Re-sum this if
-       the SolidWorks export changes. -->
-  <xacro:property name="vehicle_mass" value="11.3815"/>
-  <!-- Displaced volume that makes the vehicle exactly neutrally buoyant.
-       The real hull is trimmed slightly positive; add a few percent here
-       to reproduce that (the hull then rises slowly when unpowered). -->
+       That base_link figure is set so the sum is the MEASURED 40.0 kg (the
+       raw SolidWorks export summed to 11.38 kg, see the note on base_link's
+       <inertial>). Buoyancy acts on base_link only but has to carry the
+       whole model, so it is sized from the total, not base_link's own mass,
+       and the two must agree to every digit: a 0.005 N mismatch is a steady
+       ~3 mm/s sink with nothing else acting in heave. Re-sum this if the
+       SolidWorks export or the base_link mass changes. -->
+  <xacro:property name="vehicle_mass" value="40.0"/>
+  <!-- Displaced volume that makes the vehicle exactly neutrally buoyant:
+       39.0 L at 40 kg. The 2.4 m x 0.16 m envelope (cylinder with
+       hemispherical ends) encloses ~47 L, so ~8 L of it is free-flooding
+       or the pressure hull is shorter than the envelope; only the sealed
+       volume counts here. The
+       real hull is trimmed slightly positive; add a few percent to
+       reproduce that (the hull then rises slowly when unpowered). -->
   <xacro:property name="displaced_volume" value="${vehicle_mass / fluid_density}"/>
   <!-- Composite centre of gravity of the whole export in the base_link
        frame: sum(m_i * p_i) / sum(m_i) over every link, with each link's
        <inertial> origin pushed through its joint origin. Tail-heavy, because
        the four fins + propeller (1.1 kg) sit ~0.9 m aft of the hull's own
-       CoM. Buoyancy has to act directly above THIS point, not above the
-       link origin, or the hull pitches nose-up (first test run: ~80 deg).
-       Re-run the sum if the SolidWorks export changes. -->
-  <xacro:property name="vehicle_cog_x" value="-0.1354"/>
+       CoM; less so now that base_link is 38.4 kg rather than 9.8 (the
+       11.38 kg export put it at -0.1354). Buoyancy has to act directly
+       above THIS point, not above the link origin, or the hull pitches
+       nose-up (first test run: ~80 deg). Re-run the sum if the SolidWorks
+       export or the base_link mass changes. -->
+  <xacro:property name="vehicle_cog_x" value="-0.0883"/>
   <xacro:property name="vehicle_cog_y" value="0.0"/>
   <xacro:property name="vehicle_cog_z" value="0.0"/>
   <!-- Metacentric margin: CoB this far above the composite CoG. 3 cm is an
@@ -49,12 +57,12 @@
   <xacro:property name="hull_lateral_area" value="${hull_length * 2 * hull_radius}"/>
   <!-- Kinematic limits shared with Nav2. min_turning_radius here MUST equal
        controller_server.FollowPath.min_turning_radius in
-       auv_navigation/config/nav2_params.yaml (4.16 m, derived there from a
+       auv_navigation/config/nav2_params.yaml (5.0 m, above the 4.16 m from a
        30 deg effective fin deflection). The URDF's fin joints allow +-52 deg
        (0.9076 rad), which would give ~1.9 m; the tighter value is kept on
        purpose until Nav2 is retuned - change both together. -->
   <xacro:property name="max_linear_speed" value="2.06"/>
-  <xacro:property name="min_turning_radius" value="4.16"/>
+  <xacro:property name="min_turning_radius" value="5.0"/>
 
   <!-- Gravity on; auv_current_plugin::Buoyancy supplies the counter-force. -->
   <gazebo reference="base_link">
@@ -104,11 +112,11 @@
        tuning carries over from the placeholder unchanged. gz-sim's own
        LiftDrag + Thruster systems are the upgrade path if fin hydrodynamics
        are ever wanted in the loop.
-       Gain stability bound is 2*I/dt (see thrust_control.hpp): with an
-       11.4 kg vehicle and dt=4 ms that is ~5700 N/(m/s) linear and, with
-       the fins/prop ~0.8-1.1 m from the CoG, ~500 N*m/(rad/s) angular, so
-       40 / 0.5 are far inside it. max_force is lowered from the 52 kg
-       placeholder's 200 N: 60 N on 11.4 kg is already ~5 m/s^2. -->
+       Gain stability bound is 2*I/dt (see thrust_control.hpp): with a
+       40 kg vehicle and dt=4 ms that is ~20000 N/(m/s) linear and, with
+       the fins/prop ~0.8-1.1 m from the CoG, ~1000 N*m/(rad/s) angular, so
+       40 / 20 are far inside it. max_force 60 N on 40 kg is 1.5 m/s^2,
+       roughly what a ~6 kgf propeller gives once drag is subtracted. -->
   <gazebo>
     <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
       <link_name>base_link</link_name>
@@ -123,20 +131,23 @@
            moments (a real fin set gives N*m of authority at cruise). 0.5
            let the hull weathervane ~1 rad in 30 s with zero yaw command,
            so Nav2 oscillated and turned the wrong way. Stability bound is
-           2*I_zz/dt ~ 550 N*m/(rad/s) for I_zz ~ 1.1 kg m^2 at dt = 4 ms. -->
+           2*I_zz/dt ~ 1000 N*m/(rad/s) for I_zz ~ 2 kg m^2 (composite:
+           base_link 1.0 + fins/prop 1.1 kg at ~0.9 m) at dt = 4 ms. -->
       <angular_gain>20.0</angular_gain>
       <max_force>60.0</max_force>
       <max_torque>40.0</max_torque>
       <max_linear_speed>${max_linear_speed}</max_linear_speed>
       <min_turning_radius>${min_turning_radius}</min_turning_radius>
       <!-- Depth autopilot: holds the spawn depth (and integrates
-           cmd_vel.linear.z). Critically damped for an ~11-50 kg hull:
-           omega = sqrt(20/m), zeta ~ 30 / (2 sqrt(20 m)). Without it the
-           hull drifts a few mm/s in heave from any sub-newton imbalance,
-           since nothing else regulates depth once gravity is real. -->
+           cmd_vel.linear.z). Critically damped for the 40 kg hull:
+           omega = sqrt(20/40) = 0.71 rad/s, zeta = 56 / (2 sqrt(20*40))
+           = 0.99 (30 was critical for the old 11.4 kg figure; on 40 kg it
+           is zeta 0.53). Without it the hull drifts a few mm/s in heave
+           from any sub-newton imbalance, since nothing else regulates
+           depth once gravity is real. -->
       <depth_hold>true</depth_hold>
       <depth_gain>20.0</depth_gain>
-      <depth_damping>30.0</depth_damping>
+      <depth_damping>56.0</depth_damping>
       <max_vertical_force>30.0</max_vertical_force>
       <max_vertical_speed>0.5</max_vertical_speed>
       <!-- Treat cmd_vel as zero after this long without a message. -->
@@ -186,9 +197,10 @@
       <robot_base_frame>base_link</robot_base_frame>
       <!-- 3, not 2: the extra Z carries the hull's true depth, which
            auv_control's sim_depth_sensor turns into a simulated Bar30
-           reading for the depth-hold controller. The EKF is unaffected:
-           auv_localization/config/ekf.yaml selects only vx, vy and yaw
-           rate out of this message and runs in two_d_mode. -->
+           reading for the depth-hold controller and (through
+           auv_localization's depth_to_pose) for the EKF's z. The EKF
+           (auv_localization/config/ekf.yaml, 3-D) takes only the body
+           velocities vx, vy, vz out of this message, never its pose. -->
       <dimensions>3</dimensions>
       <odom_publish_frequency>20</odom_publish_frequency>
       <odom_topic>/dvl_odom</odom_topic>

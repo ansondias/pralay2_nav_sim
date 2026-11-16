@@ -15,28 +15,38 @@
        the SolidWorks export. -->
   <xacro:arg name="sim_mode" default="false"/>
 
-  <!-- Hull envelope, measured from meshes/base_link.STL's bounding box
-       (x: -1.204..1.205, y: +-0.088, z: -0.125..0.270 incl. the top mast).
-       Used for the sim collision cylinder and, in the .gazebo.xacro, for
-       the drag areas. Re-measure if the hull is re-exported. -->
-  <xacro:property name="hull_length" value="2.41"/>
-  <xacro:property name="hull_radius" value="0.088"/>
+  <!-- Hull envelope from the vehicle spec: 2.4 m long, 160 mm diameter,
+       40 kg all-up with payload. (The exported mesh's bounding box is
+       x: -1.204..1.205, y: +-0.088, z: -0.125..0.270; the extra width is
+       fin roots / rails and the height is the top mast, not the pressure
+       hull.) Used for the sim collision cylinder and, in the .gazebo.xacro,
+       for the drag areas. -->
+  <xacro:property name="hull_length" value="2.4"/>
+  <xacro:property name="hull_radius" value="0.08"/>
 
   <link
     name="base_link">
+    <!-- Mass: the SolidWorks export gave base_link 9.797 kg (no material
+         densities on most bodies), which summed with the other links to
+         11.38 kg for a hull that displaces ~57 L. The vehicle was weighed at
+         40.0 kg, so base_link carries 40.0 minus the 1.584 kg of the other
+         exported links. The inertia tensor is the SolidWorks one scaled by
+         the same 3.921 factor, i.e. it assumes the missing mass is spread
+         like the modelled geometry; the CoM origin is kept. Both are
+         placeholders until a balance/pendulum test measures them. -->
     <inertial>
       <origin
         xyz="-0.0695761062294844 -9.48671346927477E-06 0.000877181801452732"
         rpy="0 0 0" />
       <mass
-        value="9.79712043227885" />
+        value="38.41562043227885" />
       <inertia
-        ixx="0.0447126235666347"
-        ixy="3.94289693366845E-07"
-        ixz="-0.000145403305859678"
-        iyy="0.253973375427658"
-        iyz="-1.84761079624565E-07"
-        izz="0.254731789225581" />
+        ixx="0.175323268437935"
+        ixy="1.54605460915184E-06"
+        ixz="-0.000570142854333033"
+        iyy="0.995858411435711"
+        iyz="-7.24469149335993E-07"
+        izz="0.998832237958821" />
     </inertial>
     <!-- Visual: the SolidWorks export is ~400k triangles (20 MB). In
          sim_mode the Gazebo GUI and RViz (both on software GL inside a

@@ -1,7 +1,7 @@
 # ros_pralay_2_v1
 
-SolidWorks URDF export of the real Pralay-2 hull (2.41 m x 0.176 m, 11.4 kg
-as exported: four stern fins on revolute joints, one stern propeller
+SolidWorks URDF export of the real Pralay-2 hull (2.4 m x 0.16 m, 40 kg
+all-up, as exported: four stern fins on revolute joints, one stern propeller
 `T1_Joint`, DVL / IMU / GPS / depth-sensor / relay / nav-light links and
 three dead-weight links on fixed joints), plus the Gazebo and RViz wiring
 to run it in the `pralay2_nav_sim` sandbox instead of the placeholder
@@ -12,8 +12,8 @@ sim-specific hangs off one xacro arg, `sim_mode`:
 
 | `sim_mode` | used by | ros2_control hardware | base_link collision | extras |
 |---|---|---|---|---|
-| `false` (default) | `display.launch.py`, `robot.launch.py` (real boat) | serial STM32 plugins or `mock_components` | 20 MB exported mesh | - |
-| `true` | `auv_gazebo spawn.launch.py robot:=pralay2` | `gz_ros2_control/GazeboSimSystem` | 2.41 x r0.088 cylinder | `ROS_PRALAY_2_V1.gazebo.xacro` |
+| `false` (default) | `display.launch.py`, `robot.launch.py` (real AUV) | serial STM32 plugins or `mock_components` | 20 MB exported mesh | - |
+| `true` | `auv_gazebo spawn.launch.py robot:=pralay2` | `gz_ros2_control/GazeboSimSystem` | 2.4 x r0.08 cylinder | `ROS_PRALAY_2_V1.gazebo.xacro` |
 
 ## Launch files
 
@@ -38,7 +38,7 @@ Isaac-Sim specific any more.
 | `auv_current_plugin::Buoyancy` | upward force sized from the *total* vehicle mass (11.3815 kg / 1025 kg/m^3) applied at the composite centre of gravity (x = -0.135 m) + 3 cm, so the tail-heavy multi-link hull floats level |
 | `auv_current_plugin::ThrustControl` | `/cmd_vel` -> surge-only force + yaw torque at the composite CoM (this is what actually moves the hull); depth hold with `/depth_setpoint`; propeller off and free drift after 1 s without a command |
 | `auv_current_plugin::OceanCurrent` | depth-decaying, monsoon-cycling current drag at the composite CoM; drag areas from the real hull envelope |
-| `gz::sim::systems::OdometryPublisher` | `/dvl_odom` (DVL-like physics odometry, 2-D) |
+| `gz::sim::systems::OdometryPublisher` | `/dvl_odom` (DVL-like physics odometry, 3-D twist) |
 | `gz::sim::systems::Imu` on link `IMU` | `/imu/data` |
 
 Topics and frames match the placeholder exactly (`/cmd_vel`, `/dvl_odom`,
@@ -46,7 +46,7 @@ Topics and frames match the placeholder exactly (`/cmd_vel`, `/dvl_odom`,
 `auv_localization/config/ekf.yaml` and `auv_navigation` are unchanged.
 
 Kinematic limits in the xacro (`max_linear_speed` 2.06 m/s,
-`min_turning_radius` 4.16 m) are deliberately kept equal to
+`min_turning_radius` 5.0 m) are deliberately kept equal to
 `auv_navigation/config/nav2_params.yaml`. The URDF's +-52 deg fin travel
 would allow a ~1.9 m radius; retune Nav2 and this file together if you
 want it.
@@ -60,7 +60,7 @@ the propeller spins, and a Nav2 goal 17 m away *behind* the vehicle
 succeeded with a single wide U-turn and no recovery behaviours.
 
 Nav2 is tuned for this hull in `auv_navigation/config/nav2_params.yaml`
-(RPP lookahead 2-6 m, 2 m goal tolerance: with a 4.16 m turning radius a
+(RPP lookahead 2-6 m, 2 m goal tolerance: with a 5.0 m turning radius a
 missed tight goal means circling it) and uses
 `auv_navigation/behavior_trees/navigate_to_pose_auv.xml`, the stock tree
 minus the Spin recovery (it cannot rotate in place; the fins just sat at

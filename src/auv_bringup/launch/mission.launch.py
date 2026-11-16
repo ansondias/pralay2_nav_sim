@@ -24,6 +24,11 @@ Depth hold keeps running through the transit: it owns the elevator (left
 and right) fins, Nav2 only ever commands surge and yaw, so they do not
 fight. Any depth excursion during the transit is logged and counted.
 
+The plan itself is 2-D. For RViz, plan_at_depth republishes /plan and
+/local_plan as /plan_at_depth and /local_plan_at_depth with z = -target
+depth, so with the 3-D EKF the path is drawn where the hull will fly it
+rather than on the surface.
+
 Useful arguments:
     goal_topic                 where goals are read from (RViz tool topic)
     target_depth               metres below the surface (default 1.0)
@@ -56,6 +61,9 @@ def generate_launch_description():
         DeclareLaunchArgument("target_depth", default_value="1.0"),
         DeclareLaunchArgument("settle_time", default_value="5.0"),
         DeclareLaunchArgument("goal_topic", default_value="/mission/goal_pose"),
+        DeclareLaunchArgument("enable_delivery", default_value="false"),
+        DeclareLaunchArgument("cruise_speed", default_value="1.0"),
+        DeclareLaunchArgument("on_abort", default_value="hold"),
     ]
 
     sim = LaunchConfiguration("sim")
@@ -79,6 +87,7 @@ def generate_launch_description():
         launch_arguments={
             "sim": sim,
             "target_depth": LaunchConfiguration("target_depth"),
+            "enabled": "false",   # phase 1 DEPLOY is inert; phase 4 ARM enables it
         }.items(),
     )
 
@@ -101,10 +110,37 @@ def generate_launch_description():
                             LaunchConfiguration("settle_time"), value_type=float),
                         "goal_topic": ParameterValue(
                             LaunchConfiguration("goal_topic"), value_type=str),
+                        "enable_delivery": ParameterValue(
+                            LaunchConfiguration("enable_delivery"), value_type=bool),
+                        "cruise_speed": ParameterValue(
+                            LaunchConfiguration("cruise_speed"), value_type=float),
+                        "on_abort": ParameterValue(
+                            LaunchConfiguration("on_abort"), value_type=str),
+                        # Must match the planner's current model and the thrust cap.
+                        "water_current_speed": 0.3,
+                        "water_current_direction_north": 135.0,
+                        "max_attainable_speed": 2.06,
                     }
                 ],
             )
         ],
     )
 
-    return LaunchDescription(args + [bringup, depth_hold, mission])
+    # RViz-only: Nav2's /plan and /local_plan have z = 0 (the surface);
+    # republish them at the held depth so they sit on the hull in the 3-D
+    # view. Follows the sequencer's latched /depth_hold/target_depth.
+    plan_at_depth = Node(
+        package="auv_bringup",
+        executable="plan_at_depth.py",
+        name="plan_at_depth",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": ParameterValue(sim, value_type=bool),
+                "default_depth": ParameterValue(
+                    LaunchConfiguration("target_depth"), value_type=float),
+            }
+        ],
+    )
+
+    return LaunchDescription(args + [bringup, depth_hold, mission, plan_at_depth])

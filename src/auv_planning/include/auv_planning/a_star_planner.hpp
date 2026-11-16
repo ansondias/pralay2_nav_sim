@@ -84,7 +84,7 @@ private:
   // between grid cells. Must match controller_server.FollowPath's
   // min_turning_radius in auv_navigation/config/nav2_params.yaml and
   // auv_current_plugin::ThrustControl's clamp.
-  double minimum_turning_radius_{4.16};
+  double minimum_turning_radius_{5.0};
   // Arc length of one motion primitive, m. Longer is faster to search and
   // coarser; it must stay well under the turning radius or a single
   // primitive sweeps too much heading to collision-check sensibly.

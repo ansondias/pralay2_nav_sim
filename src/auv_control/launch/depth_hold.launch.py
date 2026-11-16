@@ -1,6 +1,6 @@
 """Depth hold for the Pralay-2 (dive to target_depth and keep it).
 
-    ros2 launch auv_control depth_hold.launch.py                  # real boat, config/depth_hold.yaml
+    ros2 launch auv_control depth_hold.launch.py                  # real AUV, config/depth_hold.yaml
     ros2 launch auv_control depth_hold.launch.py sim:=true        # under Gazebo
     ros2 launch auv_control depth_hold.launch.py target_depth:=2.0
 
@@ -28,11 +28,14 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("sim", default_value="false"),
             DeclareLaunchArgument("target_depth", default_value="1.0"),
+            # The mission sequencer starts it disabled (phase 1 DEPLOY is inert)
+            # and arms it in phase 4; standalone use keeps the old behaviour.
+            DeclareLaunchArgument("enabled", default_value="true"),
             DeclareLaunchArgument("params_file", default_value=config),
             # Gazebo has no pressure sensor: sim_depth_sensor turns the
             # simulated odometry's Z into a Bar30 reading so the controller
             # closes its loop on real feedback instead of sitting in its
-            # "no depth yet" state. Not started on the boat, where the real
+            # "no depth yet" state. Not started on the AUV, where the real
             # Bar30 driver publishes these topics.
             Node(
                 package="auv_control",
@@ -59,9 +62,11 @@ def generate_launch_description():
                             LaunchConfiguration("sim"), value_type=bool),
                         "target_depth": ParameterValue(
                             LaunchConfiguration("target_depth"), value_type=float),
+                        "enabled": ParameterValue(
+                            LaunchConfiguration("enabled"), value_type=bool),
                         # In sim the stand-in sensor gives depth in metres
                         # directly; the pressure path (and its surface
-                        # auto-zero, which assumes the boat starts at the
+                        # auto-zero, which assumes the AUV starts at the
                         # surface) is the hardware one.
                         "depth_source": ParameterValue(
                             PythonExpression(

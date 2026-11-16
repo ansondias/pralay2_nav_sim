@@ -10,10 +10,9 @@
        derived to make this near-neutral by construction; residual
        imbalance (approximated hull_volume, no exact ballast trim) is
        expected and realistic: real AUVs are trimmed, not exactly
-       neutral either. Nav2/the EKF (auv_localization/config/ekf.yaml,
-       two_d_mode: true) still deliberately ignore Z/roll/pitch: this adds
-       physical realism to the sim, not 3D localization/planning; see
-       auv_gazebo/README. -->
+       neutral either. The EKF (auv_localization/config/ekf.yaml) is 3-D
+       and fuses depth, so RViz shows the hull where it is; Nav2 still
+       plans in 2-D and reads only x, y, yaw from it. -->
   <gazebo reference="base_link">
     <gravity>true</gravity>
   </gazebo>
@@ -47,9 +46,10 @@
        Vehicle is Ackermann-steered (fin/rudder, not thrust-vectored): rated
        for 4 kn (2.06 m/s) top speed, and yaw rate is clamped to what a
        min_turning_radius_ turn allows at the current speed; it cannot
-       rotate in place. min_turning_radius (4.16 m) = hull_length (2.4 m,
+       rotate in place. min_turning_radius 5.0 m (hull_length 2.4 m,
        auv_description/urdf/auv.urdf.xacro) / tan(30 deg max fin
-       deflection). Must match controller_server.FollowPath.min_turning_radius
+       deflection gives 4.16 m; 5.0 m for margin). Must match
+       controller_server.FollowPath.min_turning_radius
        in auv_navigation/config/nav2_params.yaml. -->
   <gazebo>
     <plugin filename="thrust_control" name="auv_current_plugin::ThrustControl">
@@ -63,7 +63,7 @@
       <max_force>200.0</max_force>
       <max_torque>20.0</max_torque>
       <max_linear_speed>2.06</max_linear_speed>
-      <min_turning_radius>4.16</min_turning_radius>
+      <min_turning_radius>5.0</min_turning_radius>
       <!-- Depth autopilot: holds the spawn depth (and integrates
            cmd_vel.linear.z). Critically damped for an ~11-50 kg hull:
            omega = sqrt(20/m), zeta ~ 30 / (2 sqrt(20 m)). Without it the

@@ -2,7 +2,7 @@
 
 Two ways to run it:
 
-  sim:=false (default) - real boat / mock hardware. Starts a standalone
+  sim:=false (default) - real AUV / mock hardware. Starts a standalone
     ros2_control_node (controller_manager) from config/controllers.yaml,
     reading the URDF from /robot_description (robot.launch.py publishes it),
     then spawns the controllers into it.

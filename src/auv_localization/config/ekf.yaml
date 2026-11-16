@@ -1,33 +1,53 @@
 ekf_filter_node:
   ros__parameters:
-    use_sim_time: true
+    # use_sim_time is set by localization.launch.py (default true; pass
+    # use_sim_time:=false on the AUV).
     frequency: 30.0
-    two_d_mode: true
+    # 3-D: depth is a real state now, not thrown away. The odom->base_link
+    # transform carries the AUV's z (metres above the surface, so negative
+    # when submerged) and its roll/pitch, so RViz shows the hull where it is
+    # and the at-depth path (auv_bringup's plan_at_depth) sits on it. Nav2
+    # only reads x, y and yaw out of this transform, so planning is
+    # unaffected.
+    two_d_mode: false
     publish_tf: true
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     world_frame: odom
 
-    # "DVL-like" velocity source: the sim's OdometryPublisher plugin
-    # (real physics-measured twist), standing in for a real DVL + depth
-    # sensor fusion front-end. Only the twist fields are trusted here;
-    # the EKF integrates pose itself.
+    # DVL (in sim: the OdometryPublisher plugin's physics twist on the same
+    # topic): body-frame velocities only. Pose is integrated here, never
+    # taken from the DVL's own dead reckoning.
     odom0: /dvl_odom
     odom0_config: [false, false, false,
                    false, false, false,
-                   true,  true,  false,
-                   false, false, true,
+                   true,  true,  true,
+                   false, false, false,
                    false, false, false]
     odom0_differential: false
     odom0_relative: false
 
+    # IMU: full attitude and all three rates. Accelerations stay off; the
+    # DVL already supplies velocity and they only add noise.
     imu0: /imu/data
     imu0_config: [false, false, false,
-                   false, false, true,
-                   false, false, false,
-                   false, false, true,
-                   false, false, false]
+                  true,  true,  true,
+                  false, false, false,
+                  true,  true,  true,
+                  false, false, false]
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
+
+    # Depth (Bar30, via auv_localization's depth_to_pose): the one absolute
+    # position reference underwater. Only z is fused; z = -depth in odom,
+    # with map->odom the identity so map z = 0 is the free surface.
+    pose0: /depth/pose
+    pose0_config: [false, false, true,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    pose0_differential: false
+    pose0_relative: false

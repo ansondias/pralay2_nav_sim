@@ -137,7 +137,7 @@ private:
   // and what the hull can actually do agree; enforced here too so this
   // holds regardless of what publishes cmd_vel (teleop included).
   double max_linear_speed_{2.06};    // m/s (4 kn)
-  double min_turning_radius_{4.16};  // m (2.4 m hull_length / tan(30 deg))
+  double min_turning_radius_{5.0};  // m (>= 2.4 m hull_length / tan(30 deg))
 };
 
 }  // namespace auv_current_plugin

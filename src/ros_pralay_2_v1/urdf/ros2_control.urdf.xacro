@@ -55,7 +55,7 @@
              from the physics engine, so the same fin_controller /
              thruster_controller (auv_control/config/controllers.yaml) and
              the same /fin_controller/commands, /thruster_controller/commands
-             topics work in sim and on the real boat. -->
+             topics work in sim and on the real AUV. -->
         <xacro:if value="$(arg sim_mode)">
             <hardware>
                 <plugin>gz_ros2_control/GazeboSimSystem</plugin>

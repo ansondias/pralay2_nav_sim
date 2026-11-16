@@ -24,10 +24,10 @@ What it does
                   [target - tolerance, target + tolerance] (default
                   1.0 m +- 0.2 m, i.e. 0.8..1.2 m).
     3. SURFACING: if `surface_on_timeout` and the depth sensor goes silent,
-                  fins go to full nose-up so a real boat comes up.
+                  fins go to full nose-up so the real AUV comes up.
 
 Control law (all signs verified in a kinematic simulation, and every sign
-is also a parameter so it can be flipped on the boat without touching code):
+is also a parameter so it can be flipped on the AUV without touching code):
     depth_error   = target_depth - depth              (m, +ve: too shallow)
     desired_pitch = clamp( Kp_d*e + Ki_d*int(e) + Kd_d*(-depth_rate), +-max_pitch )
                     (+ve = nose DOWN in the ROS FLU body frame)
@@ -96,7 +96,7 @@ class DepthHold(Node):
         self.declare_parameter("fluid_density", 1025.0)      # kg/m^3 (997 fresh water)
         self.declare_parameter("gravity", 9.80665)
         # Surface (atmospheric) pressure. auto_zero averages the first
-        # `auto_zero_samples` readings on start-up (boat must be at the
+        # `auto_zero_samples` readings on start-up (the AUV must be at the
         # surface then); otherwise surface_pressure_pa is used as-is.
         self.declare_parameter("surface_pressure_pa", 101325.0)
         self.declare_parameter("auto_zero", True)
@@ -116,7 +116,7 @@ class DepthHold(Node):
         self.declare_parameter("kp_pitch", 2.0)     # rad elevator per rad pitch error
         self.declare_parameter("kd_pitch", 0.4)     # rad elevator per (rad/s) pitch rate
         self.declare_parameter("max_elevator", 0.70)  # rad (~40 deg): under the 45 deg servo stop
-        self.declare_parameter("elevator_sign", 1.0)  # flip if the boat climbs when it should dive
+        self.declare_parameter("elevator_sign", 1.0)  # flip if the AUV climbs when it should dive
         self.declare_parameter("pitch_sign", 1.0)     # flip if the IMU reports nose-up as +ve
 
         # ---- speed scaling (fin authority ~ v^2) --------------------------

@@ -15,7 +15,7 @@ republishes it the way the real sensor and its driver would:
 is the same reference `auv_current_plugin::ThrustControl` uses for its own
 depth hold and for `/depth_setpoint`.
 
-Only for simulation. On the boat the real Bar30 driver publishes these
+Only for simulation. On the AUV the real Bar30 driver publishes these
 topics and this node is not started.
 """
 

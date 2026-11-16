@@ -13,7 +13,7 @@ when a node is expanded, stale queue entries skipped. Cells whose costmap
 value is at or above `lethal_cost_threshold` (99) are impassable; with the
 costmaps sized for the real hull (`robot_radius` 1.2, `inflation_radius`
 2.0, `cost_scaling_factor` 1.5) that keeps every path about 1.8 m or more
-from an obstacle edge, so the 2.41 m hull clears reefs mid-turn. Poses are
+from an obstacle edge, so the 2.4 m hull clears reefs mid-turn. Poses are
 cell centres, the ends are the exact start/goal, and every pose carries a
 heading along the path.
 

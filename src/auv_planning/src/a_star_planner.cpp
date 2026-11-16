@@ -74,7 +74,7 @@ node->get_parameter(name_ + ".lethal_cost_threshold", lethal_cost_threshold_);
 // Kinematic search: the hull cannot turn tighter than this, so the search
 // expands along arcs of it instead of stepping cell to cell.
 if (!node->has_parameter(name_ + ".minimum_turning_radius")) {
-  node->declare_parameter(name_ + ".minimum_turning_radius", 4.16);
+  node->declare_parameter(name_ + ".minimum_turning_radius", 5.0);
 }
 if (!node->has_parameter(name_ + ".primitive_length")) {
   node->declare_parameter(name_ + ".primitive_length", 1.0);

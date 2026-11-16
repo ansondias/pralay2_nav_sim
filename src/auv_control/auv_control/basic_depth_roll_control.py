@@ -5,16 +5,24 @@ Publishes Fin_Left / Fin_Right already in /fin_controller/commands units and
 joint sign convention; thrustmaster.py forwards them untouched while they are
 fresh. If depth or IMU data goes stale this node stops publishing, and
 thrustmaster falls back to the joystick depth axis.
+
+On by default (autonomous vehicle; the joystick is for emergencies).
+/depth_hold/enable (latched Bool, the GCS switch relayed by
+jetson_tcp_node_d_m.py) turns it off when the operator needs the side fins.
+/depth_hold/status reports what it is actually doing, so the GCS can show
+more than the switch position.
 """
 
+import json
 import math
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from sensor_msgs.msg import Imu
-from std_msgs.msg import Float64
+from std_msgs.msg import Bool, Float64, String
 
 
 def clamp(value, limit):
@@ -38,8 +46,8 @@ class DepthRollControl(Node):
         super().__init__("depth_roll_control")
 
         # Depth
-        self.declare_parameter("target_depth", 0.0)      # m
-        self.declare_parameter("tolerance", 0.2)         # m: 0.8 .. 1.2 is in band
+        self.declare_parameter("target_depth", 1.0)      # m
+        self.declare_parameter("tolerance", 0.4)         # m: 0.8 .. 1.2 is in band
         self.declare_parameter("max_pitch", 20.0)        # deg, nose-down limit
         self.declare_parameter("kp_depth", 20.0)         # deg of pitch per m of error
         self.declare_parameter("kp_pitch", 2.0)          # deg of elevator per deg of pitch error
@@ -59,7 +67,7 @@ class DepthRollControl(Node):
         # right (the joystick path in thrustmaster.py does the same mirror).
         # Output is therefore already in joint convention - thrustmaster must
         # NOT negate the right fin again, or elevator and aileron swap.
-        self.declare_parameter("fin_pair_signs", [1.0, -1.0])   # [Left, Right]
+        self.declare_parameter("fin_pair_signs", [-1.0, 1.0])   # [Left, Right]
         self.declare_parameter("elevator_sign", 1.0)
         # +aileron = Fin_Left trailing edge up + Fin_Right trailing edge down
         # = left side pushed down = NEGATIVE roll (REP-103, +roll = starboard
@@ -101,6 +109,9 @@ class DepthRollControl(Node):
         self.roll = 0.0
         self.state = "DIVING"
         self.stale_warned = False
+        # On by default; the GCS switch (/depth_hold/enable) turns it off.
+        self.enabled = True
+        self.status = "NO_DATA"   # OFF | NO_DATA | STALE | DIVING | HOLDING
 
         # /depth/pose comes from auv_fusion pressure_depth.py, which already
         # handles the driver's hPa-in-FluidPressure units and captures surface
@@ -112,6 +123,14 @@ class DepthRollControl(Node):
 
         self.left_fin_pub = self.create_publisher(Float64, '/left_fin_pub', 10)
         self.right_fin_pub = self.create_publisher(Float64, '/right_fin_pub', 10)
+
+        # Latched, so a restarted node picks up the operator's last choice
+        # instead of waiting for the switch to be flipped again.
+        self.create_subscription(
+            Bool, "/depth_hold/enable", self.enable_callback,
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        self.status_pub = self.create_publisher(String, "/depth_hold/status", 10)
+        self.create_timer(1.0, self.publish_status)
 
         self.create_timer(1.0 / float(p("control_rate").value), self.control_step)
         self.get_logger().info(
@@ -129,6 +148,27 @@ class DepthRollControl(Node):
         self.pitch = quaternion_to_pitch(q.w, q.x, q.y, q.z)
         self.roll = quaternion_to_roll(q.w, q.x, q.y, q.z)
         self.imu_time = self.get_clock().now()
+
+    def enable_callback(self, msg: Bool):
+        if msg.data == self.enabled:
+            return
+        self.enabled = msg.data
+        if self.enabled:
+            # Re-acquire from scratch: HOLDING from an earlier engagement says
+            # nothing about where the vehicle is now.
+            self.state = "DIVING"
+            self.stale_warned = False
+        self.get_logger().info(
+            "depth hold ENABLED" if self.enabled
+            else "depth hold DISABLED - fins left to the joystick")
+
+    def publish_status(self):
+        self.status_pub.publish(String(data=json.dumps({
+            "enabled": self.enabled,
+            "state": self.status,
+            "depth": None if self.depth is None else round(self.depth, 2),
+            "target": round(self.target_depth, 2),
+        })))
 
     def age(self, stamp):
         return (self.get_clock().now() - stamp).nanoseconds * 1e-9
@@ -158,10 +198,15 @@ class DepthRollControl(Node):
                          -self.max_aileron, self.max_aileron)
 
     def control_step(self):
+        if not self.enabled:
+            self.status = "OFF"
+            return
         if self.depth_time is None or self.imu_time is None:
+            self.status = "NO_DATA"
             return
         if (self.age(self.depth_time) > self.sensor_timeout_sec
                 or self.age(self.imu_time) > self.sensor_timeout_sec):
+            self.status = "STALE"
             if not self.stale_warned:
                 self.get_logger().warn(
                     f"depth/IMU older than {self.sensor_timeout_sec:.1f}s - "
@@ -172,6 +217,7 @@ class DepthRollControl(Node):
 
         elevator = self.elevator_sign * self.depth_to_elevator()
         aileron = self.aileron_sign * self.roll_to_aileron()
+        self.status = self.state   # after depth_to_elevator(), which can switch it to HOLDING
 
         # Depth is already capped at max_elevator, so roll always has at
         # least roll_reserve of fin left and no fin exceeds the servo stop.
@@ -212,4 +258,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
